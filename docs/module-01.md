@@ -70,11 +70,14 @@ Never commit `.env`, paste a real key into a notebook, or include it in a screen
 Before adding rules, test the model with a fictional support question:
 
 ```python
+import os
+from dotenv import load_dotenv
 from openai import OpenAI
 
-client = OpenAI()
+load_dotenv()
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 response = client.responses.create(
-    model="gpt-5-mini",
+    model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
     input="Can I return headphones after 45 days?",
 )
 print(response.output_text)
