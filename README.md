@@ -32,8 +32,8 @@ This knowledge base is the working curriculum and product reference for building
 
 Each module has a separate code workspace so examples, dependencies, and tests do not get mixed between lessons:
 
-- [Module 1 notebook](01_customer_support_llm.ipynb)
-- [Module 2 code, tests, and notebook](module-02/)
+- [Module 1 lesson](docs/module-01.md) · [Module 1 standalone code, notebook, and tests](module-01/)
+- [Module 2 lesson](docs/module-02.md) · [Module 2 standalone code, notebook, and tests](module-02/)
 - [Module 3 lesson](knowledge-base/modules/module-03.md) · [Module 3 complete code package](module-03/)
 
 Module 3 includes its own prompt, Python router, 24 synthetic regression cases, offline tests, command-line demo, evaluation runner, and notebook. Follow [module-03/README.md](module-03/README.md) for setup.
