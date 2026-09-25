@@ -27,3 +27,13 @@ This knowledge base is the working curriculum and product reference for building
 - Minimize, redact, and audit sensitive customer data.
 - Evaluate quality, safety, latency, and cost together.
 - Keep human escalation available for consequential or uncertain cases.
+
+## Module code
+
+Each module has a separate code workspace so examples, dependencies, and tests do not get mixed between lessons:
+
+- [Module 1 notebook](01_customer_support_llm.ipynb)
+- [Module 2 code, tests, and notebook](module-02/)
+- [Module 3 lesson](knowledge-base/modules/module-03.md) · [Module 3 complete code package](module-03/)
+
+Module 3 includes its own prompt, Python router, 24 synthetic regression cases, offline tests, command-line demo, evaluation runner, and notebook. Follow [module-03/README.md](module-03/README.md) for setup.
