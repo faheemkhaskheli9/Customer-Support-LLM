@@ -1,9 +1,5 @@
 # Module 2 — Build a Healthcare Customer-Support Chatbot
 
-**Project:** Customer Support LLM  
-**Build:** Healthcare Support Assistant v0.2  
-**Learning loop:** Build → Break → Test → Improve
-
 > **Project:** Customer Support LLM  
 > **Build:** Healthcare Support Assistant v0.2  
 > **Level:** Beginner → practical LLM application engineering  
