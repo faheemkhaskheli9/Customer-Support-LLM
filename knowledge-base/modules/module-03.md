@@ -3,6 +3,8 @@
 > **Project:** Customer Support LLM  
 > **Build:** Customer Support Assistant v0.3  
 > **Learning loop:** Build → Break → Measure → Improve
+>
+> **Complete companion code:** [module-03/](../../module-03/) — setup guide, versioned prompt, Python router, 24 synthetic evaluation cases, offline tests, and a Jupyter notebook.
 
 ## Module mission
 
