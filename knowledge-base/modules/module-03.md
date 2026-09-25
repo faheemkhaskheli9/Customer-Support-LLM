@@ -124,10 +124,17 @@ def render_prompt(*, approved_policy: str, customer_message: str) -> str:
     for name in ("approved_policy", "customer_message"):
         if "{{" + name + "}}" not in template:
             raise ValueError(f"Missing placeholder: {name}")
-    return (
-        template
-        .replace("{{approved_policy}}", approved_policy)
-        .replace("{{customer_message}}", customer_message)
+    # Replace tokens in one pass so placeholder-like text inside a value
+    # cannot be interpreted as another template variable.
+    values = {
+        "{{approved_policy}}": approved_policy,
+        "{{customer_message}}": customer_message,
+    }
+    import re
+    return re.sub(
+        r"{{approved_policy}}|{{customer_message}}",
+        lambda match: values[match.group(0)],
+        template,
     )
 ~~~
 
