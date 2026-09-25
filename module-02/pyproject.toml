@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "healthcare-customer-support"
+version = "0.1.0"
+description = "Module 2 healthcare customer-support LLM"
+requires-python = ">=3.10"
+dependencies = [
+  "openai>=1.0.0",
+  "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[project.scripts]
+healthcare-chat = "customer_support.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
