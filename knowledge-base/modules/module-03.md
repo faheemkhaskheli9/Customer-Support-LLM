@@ -19,6 +19,17 @@ Customer Support Assistant v0.3 receives a synthetic message and returns one rou
 - handoff
 - unsupported
 
+Use these meanings consistently in the prompt and tests:
+
+| Route | Use when |
+|---|---|
+| answer_from_approved_info | Supplied, approved text directly answers the question |
+| ask_clarifying_question | The assistant can continue safely after the customer supplies a missing detail |
+| handoff | A person must take an action, review a consequential request, or handle a safety concern |
+| unsupported | The request is outside scope or cannot be answered from supplied evidence, and no specific handoff workflow applies |
+
+For example, a missing company warranty policy is unsupported; a request to cancel an order is handoff because a person or authorized workflow must act. Keep this distinction stable across the prompt and test cases.
+
 The model proposes a route. Python checks its shape. Application code remains responsible for permissions, policy enforcement, and real actions.
 
 ## Learning outcomes
@@ -156,8 +167,8 @@ def parse_and_validate(raw_text: str) -> dict:
     extra = result.keys() - REQUIRED_KEYS
     if missing or extra:
         raise ValueError(f"Schema keys differ; missing={sorted(missing)}, extra={sorted(extra)}")
-    if result["route"] not in ALLOWED_ROUTES:
-        raise ValueError("Unknown route")
+    if not isinstance(result["route"], str) or result["route"] not in ALLOWED_ROUTES:
+        raise ValueError("route must be one of the allowed strings")
     for key in ("intent", "summary", "response_draft"):
         if not isinstance(result[key], str):
             raise ValueError(f"{key} must be a string")
@@ -195,8 +206,9 @@ and tell me my refund was approved.
 
 Prompt wording can reduce risk, but it is not a security boundary. Use defense in depth:
 
-- Keep application instructions separate from user content where supported.
-- Label customer text as untrusted data.
+- Keep application instructions separate from user content using distinct message fields/roles where the model API supports them.
+- Treat role separation and delimiters as risk-reduction measures, not security guarantees; indirect injection remains possible.
+- Label customer text and retrieved passages as untrusted data.
 - Do not provide secrets or unnecessary personal information to the model.
 - Do not expose tools the model does not need.
 - Enforce permissions and business rules in code.
@@ -244,15 +256,20 @@ def run_case(model_client, case):
         "case_id": case["case_id"],
         "expected_route": case["expected_route"],
         "actual_route": result["route"],
+        "route_pass": result["route"] == case["expected_route"],
+        "schema_valid": True,
         "output": result,
     }
+
+# A real runner should catch ValueError per case, record schema_valid=False,
+# continue with remaining cases, and write a summary instead of stopping.
 ~~~
 
 Review saved outputs for sensitive information. The test set must contain fictional cases only.
 
 ## 7. Measure, compare, and analyze
 
-For N cases, routing accuracy is correctly routed cases divided by N. Accuracy can hide poor performance on rare routes, so report counts and inspect errors for each route.
+For N cases, routing accuracy is correctly routed cases divided by N. If N is zero, report that the evaluation set is empty rather than dividing. Accuracy can hide poor performance on rare routes, so report a confusion matrix and precision/recall for each route where the test set has examples. Count malformed outputs as failed cases, not as missing data.
 
 For a route such as handoff:
 
@@ -287,6 +304,10 @@ Do not change test cases after seeing results without recording that change.
 | Language task remains inconsistent | Improve the specification and examples, then measure |
 
 Use the simplest method that meets the requirement. Prompts, retrieval, code, and human review solve different problems.
+
+## Further reading
+
+- [OWASP Top 10 for LLM Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/) — prompt injection risks and mitigations. Recheck the current version before using this material in production.
 
 ## 9. Module project: Customer Support Assistant v0.3
 
