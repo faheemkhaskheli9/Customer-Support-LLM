@@ -55,7 +55,7 @@ pytest
 python -m prompt_lab.run_eval --cases tests/prompt_cases.jsonl --output reports/module-03-results.json
 ~~~
 
-The evaluation sends 20 synthetic prompts to the configured model and may incur API charges. Check your provider's current pricing before running it. The JSON report includes case IDs and route results, not full raw model responses.
+The evaluation sends 24 synthetic prompts to the configured model and may incur API charges. Check your provider's current pricing before running it. The JSON report includes case IDs and route results, not full raw model responses.
 
 ## Use the router interactively
 
