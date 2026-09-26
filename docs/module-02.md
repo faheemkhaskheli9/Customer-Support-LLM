@@ -674,6 +674,26 @@ Choose one small extension and write its test first. For example, add a method t
 
 Use synthetic data only. Do not test this tutorial with real patient messages or identifiable health records.
 
+### Why these implementation choices matter
+
+**Each layer has one job.** Configuration, prompts, provider calls, conversation state, orchestration, and terminal I/O are in separate modules. That makes it easier to change or test one responsibility without rebuilding the whole application. For example, the CLI can be replaced with a web endpoint while keeping HealthcareSupportBot and its tests. The trade-off is more files to navigate; the README and this walkthrough provide the map.
+
+**The provider protocol keeps the application portable.** HealthcareSupportBot calls generate() rather than importing the OpenAI SDK. A fake generator can be injected in tests, and a different provider can later implement the same method. This boundary prevents provider details from spreading across the codebase. It does not automatically make providers interchangeable: different models may have different message formats, limits, behavior, and costs.
+
+**Provider errors become application errors.** OpenAITextGenerator catches provider exceptions and raises LLMError. The CLI can then show a stable user-facing message without printing SDK details or a traceback. The current adapter catches broadly to keep the beginner example short. That can also hide programming mistakes behind the same message; a production adapter should classify known provider exceptions, log a safe error category, and allow unexpected defects to be detected by monitoring.
+
+**The turn is committed only after generation succeeds.** The chatbot builds a temporary request list, calls the provider, then saves the user and assistant messages. If the provider call fails, history remains unchanged. This avoids storing a half-turn and reduces the chance that a retry will submit the same user message twice. It is not a database transaction: if the process crashes between the successful response and saving it, the in-memory turn is lost.
+
+**Message copies protect the saved conversation.** Conversation.get_messages() returns copies of the message dictionaries. The chatbot can append the next input to its request without mutating the stored list early. This keeps request preparation separate from committing successful state. For larger systems, immutable message objects or explicit persistence transactions may make these guarantees clearer.
+
+**The character limit is an early guard, not a token budget.** Checking the message length before calling the model prevents blank or obviously oversized input from reaching the provider. Character count is simple and provider-neutral, but token counts vary by language and content. A production system should also enforce token limits, total conversation limits, request rate limits, and account-level quotas.
+
+**Conversation history is deliberately temporary.** Keeping history in memory makes the state visible and easy to learn. It also means history disappears when the process ends and is not shared across server workers. Persisting real healthcare conversations would introduce privacy, access-control, retention, and audit requirements. This tutorial does not add persistence because those controls need a separate design.
+
+**The tests use fakes because they test application logic.** The fake generator returns predictable output, allowing tests to verify validation, history, follow-up context, and failure behavior without network access. These tests are fast and deterministic. They do not measure the quality or clinical safety of model-generated answers; that needs a separate model evaluation set and qualified review.
+
+**The healthcare prompt is not a clinical safety system.** The prompt states boundaries so users and developers can see the intended scope. A language model can still misunderstand symptoms or ignore instructions. The prototype has no clinical knowledge source, validated triage protocol, medication interaction service, identity verification, or human escalation workflow, so it must not be used for care decisions.
+
 ## 12. Break the chatbot deliberately
 
 A prototype should be tested with difficult requests, not only friendly demonstrations.
