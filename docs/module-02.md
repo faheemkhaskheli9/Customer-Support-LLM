@@ -5,6 +5,14 @@
 > **Level:** Beginner → practical LLM application engineering  
 > **Learning loop:** **Build → Break → Test → Improve**
 
+## Get the complete code
+
+The code companion is a separate, self-contained Python workspace with its own package, notebook, tests, and setup instructions. It does not import Module 3 source files.
+
+[Open the Module 2 code workspace on GitHub](https://github.com/faheemkhaskheli9/Customer-Support-LLM/tree/main/module-02)
+
+Unit tests run offline. Live model requests require an API key and may incur charges.
+
 ## Module mission
 
 In Module 1, you learned that a large language model can generate convincing language without knowing whether an answer is correct. You also learned that generated text is not the same as a completed business action.
@@ -101,15 +109,13 @@ This is more structure than a five-line chatbot tutorial needs. That is delibera
 
 Each file has one primary responsibility:
 
-| File | Responsibility |
-|---|---|
-| `config.py` | Read and validate configuration |
-| `prompts.py` | Store trusted assistant instructions |
-| `conversation.py` | Maintain short-term message history |
-| `llm.py` | Communicate with the model provider |
-| `chatbot.py` | Coordinate validation, state, and generation |
-| `cli.py` | Interact with the user in a terminal |
-| `test_chatbot.py` | Test application behavior without API calls |
+- **`config.py`:** Read and validate configuration
+- **`prompts.py`:** Store trusted assistant instructions
+- **`conversation.py`:** Maintain short-term message history
+- **`llm.py`:** Communicate with the model provider
+- **`chatbot.py`:** Coordinate validation, state, and generation
+- **`cli.py`:** Interact with the user in a terminal
+- **`test_chatbot.py`:** Test application behavior without API calls
 
 ---
 
@@ -508,10 +514,8 @@ These are deterministic unit tests. They do not prove that real model responses 
 
 LLM systems need two complementary forms of testing:
 
-| Test type | Example question |
-|---|---|
-| Deterministic unit test | Did a failed API call leave history unchanged? |
-| LLM evaluation | Did the model invent a clinic fee? |
+- **Deterministic unit test:** Did a failed API call leave history unchanged?
+- **LLM evaluation:** Did the model invent a clinic fee?
 
 Later modules will build repeatable evaluation datasets for model behavior.
 
@@ -536,14 +540,12 @@ test_questions = [
 
 For each question, record:
 
-| Field | Meaning |
-|---|---|
-| Question | Exact user input |
-| Expected behavior | What a safe system should do |
-| Actual response | What the prototype returned |
-| Evidence available | Whether trusted supporting data existed |
-| Failure category | Hallucination, unsafe advice, injection, or other |
-| Improvement needed | Data, tool, code, prompt, or human escalation |
+- **Question:** Exact user input
+- **Expected behavior:** What a safe system should do
+- **Actual response:** What the prototype returned
+- **Evidence available:** Whether trusted supporting data existed
+- **Failure category:** Hallucination, unsafe advice, injection, or other
+- **Improvement needed:** Data, tool, code, prompt, or human escalation
 
 The objective is not to make the prototype appear successful. The objective is to discover what must be engineered next.
 
