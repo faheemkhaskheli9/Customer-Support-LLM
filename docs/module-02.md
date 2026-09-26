@@ -521,6 +521,159 @@ Later modules will build repeatable evaluation datasets for model behavior.
 
 ---
 
+### Detailed code tutorial: trace a healthcare support turn
+
+The snippets above introduce the pieces. Now follow one message through the actual Module 2 workspace. Keep the files in [module-02](https://github.com/faheemkhaskheli9/Customer-Support-LLM/tree/main/module-02) open while you read. The application flow is:
+
+~~~text
+cli.py → chatbot.py → llm.py → OpenAI Responses API
+              ↘ conversation.py
+~~~
+
+#### Step 1: Load settings and fail early
+
+In config.py, Settings.from_env() loads the API key and model name. It reads the local environment file for development, trims whitespace, and rejects missing values before the assistant starts:
+
+~~~python
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY", "").strip()
+model = os.getenv("OPENAI_MODEL", "gpt-5-mini").strip()
+
+if not api_key:
+    raise RuntimeError(
+        "OPENAI_API_KEY is missing. Copy .env.example to .env and add your key."
+    )
+if not model:
+    raise RuntimeError("OPENAI_MODEL must not be empty.")
+
+return cls(api_key=api_key, model=model)
+~~~
+
+This is configuration validation, not credential storage. The local environment file stays out of Git. For a hosted application, configure the secret in the hosting provider's secret manager.
+
+#### Step 2: Keep healthcare behavior in a dedicated prompt
+
+prompts.py defines SYSTEM_PROMPT. The LLM adapter sends it through the API's instructions argument, while conversation messages go through input.
+
+This separation helps you see which text came from the application and which came from the user. The prompt says not to invent clinic facts or provide diagnosis and prescribing. It also gives a brief emergency boundary.
+
+Treat that prompt as guidance only. It cannot authenticate a patient, verify a medication, block every unsafe answer, or guarantee emergency detection. The prototype has no clinic knowledge source, medication lookup, triage engine, or clinical review workflow.
+
+#### Step 3: Define the provider interface
+
+In llm.py, the TextGenerator protocol describes the one method the rest of the application needs:
+
+~~~python
+class TextGenerator(Protocol):
+    def generate(self, messages: Sequence[dict[str, str]]) -> str: ...
+~~~
+
+The chatbot depends on that small interface rather than constructing API requests itself. The live adapter creates an OpenAI client from validated settings and makes the Responses API request:
+
+~~~python
+response = self.client.responses.create(
+    model=self.settings.model,
+    instructions=SYSTEM_PROMPT,
+    input=list(messages),
+)
+text = response.output_text.strip()
+~~~
+
+The adapter converts provider exceptions into the application's LLMError. If the model returns empty text, it raises the same application-level error. The CLI only needs to understand LLMError; it does not need to know the provider's internal exception classes.
+
+This boundary also makes the code testable. A fake generator can implement generate() and return a fixed string, so unit tests run without a key, network request, or API charge.
+
+#### Step 4: Understand conversation state
+
+The Conversation class in conversation.py stores a unique ID and a list of role/content messages:
+
+~~~python
+def get_messages(self) -> list[dict[str, str]]:
+    return [message.copy() for message in self.messages]
+~~~
+
+The copies matter. The chatbot builds the next request from a separate list, so assembling a request cannot silently mutate saved history. After a successful turn, it adds the user message and assistant response to the stored conversation.
+
+This state is only in memory. Closing the program discards it. It is not an authenticated patient record, a database, or durable memory.
+
+#### Step 5: Make the turn transactional
+
+The core of HealthcareSupportBot.chat() in chatbot.py follows this order:
+
+~~~python
+clean_message = user_message.strip()
+if not clean_message:
+    return "Please enter a question."
+if len(clean_message) > self.MAX_MESSAGE_CHARACTERS:
+    return (
+        "Your message is too long. Please limit it to "
+        f"{self.MAX_MESSAGE_CHARACTERS} characters."
+    )
+
+request_messages = self.conversation.get_messages()
+request_messages.append({"role": "user", "content": clean_message})
+response = self.generator.generate(request_messages)
+
+self.conversation.add_user_message(clean_message)
+self.conversation.add_assistant_message(response)
+return response
+~~~
+
+Notice when the saved state changes: only after generate() returns successfully. If the provider raises LLMError, the new user message stays out of history. That avoids a half-completed turn and prevents a retry from duplicating the failed request.
+
+The size limit also runs before the model call. That makes the behavior deterministic and prevents an oversized message from using API resources.
+
+#### Step 6: Keep the terminal flow simple
+
+The CLI creates one bot for the session, displays its conversation ID, then passes each line to chat(). It catches LLMError and shows a generic temporary-unavailable message. It does not show exception text or a traceback to the user.
+
+Try this sequence:
+
+~~~text
+You: How should I prepare for an appointment?
+Assistant: ...
+You: Should I bring my previous reports?
+Assistant: ...
+~~~
+
+The second request contains the first exchange because both successful turns are in the in-memory conversation.
+
+#### Step 7: Prove the failure behavior offline
+
+In tests/test_chatbot.py, FakeGenerator records each request. FailingGenerator always raises LLMError. The key state test is:
+
+~~~python
+bot = HealthcareSupportBot(generator=FailingGenerator())
+
+try:
+    bot.chat("Will this failed request remain in history?")
+except LLMError:
+    pass
+
+assert bot.conversation.messages == []
+~~~
+
+Other tests confirm that blank and oversized messages do not call the model, a successful turn saves both messages, and follow-up requests include prior context. Run the whole suite from module-02:
+
+~~~bash
+pytest
+~~~
+
+These tests verify application behavior with controlled fakes. They do not evaluate whether a live model gives correct healthcare information. That requires a separate evaluation set, approved evidence, risk review, and human oversight.
+
+#### Step 8: Make one safe change
+
+Choose one small extension and write its test first. For example, add a method to reset the conversation:
+
+1. Create a new method on Conversation.
+2. Clear the message list.
+3. Generate a new conversation ID.
+4. Write a test showing the old messages are gone and the ID changed.
+5. Run pytest.
+6. Confirm that the CLI can continue after the reset.
+
+Use synthetic data only. Do not test this tutorial with real patient messages or identifiable health records.
+
 ## 12. Break the chatbot deliberately
 
 A prototype should be tested with difficult requests, not only friendly demonstrations.
