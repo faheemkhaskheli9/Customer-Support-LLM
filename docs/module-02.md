@@ -811,31 +811,11 @@ The chatbot now has a real application boundary, but it still lacks trusted orga
 
 That leads to the next module:
 
-## Module 3 — Give the Assistant Trusted Knowledge with RAG
+## Next: Module 3 — Prompt Engineering as Software Engineering
 
-There, the architecture will move from:
+The next module makes assistant instructions testable. You will turn a support prompt into a versioned contract, define routes and structured outputs, build a synthetic evaluation set, and measure how prompt changes affect behavior.
 
-```text
-Question → LLM → answer
-```
-
-to:
-
-```text
-Question
-  ↓
-Search approved knowledge
-  ↓
-Retrieve relevant evidence
-  ↓
-Question + evidence
-  ↓
-LLM
-  ↓
-Grounded answer with sources
-```
-
-That transition—from generating a plausible response to answering from retrieved evidence—is one of the most important steps in building a trustworthy customer-support LLM.
+RAG comes later in the course. It will add approved knowledge sources so the assistant can ground policy answers in retrieved evidence.
 
 ---
 
