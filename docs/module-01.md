@@ -302,6 +302,22 @@ Then it runs a few synthetic support questions using the instructed version. Com
 
 Each live notebook cell sends an API request. The tests are the free, offline checks; the notebook experiments may incur provider charges.
 
+### Why the code uses this design
+
+**The first version is intentionally small.** Module 1 isolates a single question and a single model response. It does not add conversation memory, retrieval, a database, or tools. That keeps the first experiment understandable: when the answer changes, you can inspect whether the change came from the model or from the support instructions. Module 2 adds conversation state after this baseline is clear.
+
+**Configuration is validated before the first request.** Reading the key and model name at startup avoids discovering a missing setting after a customer has already typed a message. Keeping the key outside Python source also reduces the chance that it will be committed to Git. The local .env file is only a development convenience; it is not a production secret store.
+
+**The prompt lives outside the request-handling method.** Keeping SYSTEM_INSTRUCTIONS in prompts.py makes the application behavior easy to review and revise without mixing policy text with API plumbing. The Responses API receives the instructions separately from the customer's message, which makes the source of each input clear. This separation improves organization; it does not make the instructions authoritative evidence or enforce access control.
+
+**The API client can be replaced during tests.** Passing a fake client into SupportAssistant prevents tests from making paid, unpredictable network calls. The test can assert the exact model, instructions, and input sent. This is a form of dependency injection: the assistant depends on a client interface, while the caller decides whether it receives a real or fake implementation.
+
+**Latency and tokens are measured at the boundary.** The model call is where waiting time and usage are visible, so the code measures around that call and reads usage from the response. These measurements help compare versions and investigate cost or speed regressions. Missing token counts remain None because providers or responses may omit them. The measurements do not tell us whether an answer is correct.
+
+**There is no retry loop yet.** A retry can help with temporary provider failures, but it can also repeat a request, add latency, and incur another charge. Retry policy depends on the failure type and whether the operation is safe to repeat. Module 1 keeps the failure path simple; a production service should classify errors and use bounded, observable retries only where appropriate.
+
+**The assistant does not perform business actions.** The model can draft language about a cancellation, but this project has no authenticated order system to perform one or verify its result. The code deliberately avoids tools so that learners can see the boundary between generated text and a confirmed action before adding any capability that changes customer state.
+
 ## 6. Break it deliberately
 
 Try requests that ask the assistant to reveal hidden instructions, invent a discount, or claim that an order has been cancelled. Record what happened and how the application should handle it.
