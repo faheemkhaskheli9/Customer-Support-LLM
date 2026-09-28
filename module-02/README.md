@@ -1,5 +1,7 @@
 # Module 2 — Healthcare Customer-Support Chatbot
 
+> **Historical CLI companion.** The active Modules 1–4 course code is the [shared Django web app](../webapp/). This folder stays available for older published links.
+
 This is the self-contained code companion for Module 2. It has its own Python package, notebook, and offline tests. It does not import source code from Modules 1 or 3.
 
 The chatbot demonstrates input validation, conversation state, a replaceable model interface, and controlled errors. It has no trusted clinic knowledge, medication database, symptom tool, or production safety layer. Do not use it to diagnose, prescribe, or replace professional care.

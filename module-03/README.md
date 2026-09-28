@@ -1,5 +1,7 @@
 # Module 3 — Prompt Engineering Lab
 
+> **Historical CLI companion.** The active Modules 1–4 course code is the [shared Django web app](../webapp/). This folder stays available for older published links.
+
 This directory is the complete, self-contained code companion for Module 3. It has its own prompt, Python package, test cases, tests, and notebook. It does not change or import Module 2 source files.
 
 The lab classifies synthetic support requests. It does not complete refunds or order changes and must not be used for diagnosis, prescribing, or emergency decisions.
