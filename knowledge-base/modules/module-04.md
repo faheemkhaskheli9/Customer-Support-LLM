@@ -6,7 +6,7 @@
 >
 > **Learning loop:** Build → Break → Measure → Improve
 >
-> **Complete code:** [module-04/](../../module-04/) — setup, source, 25 synthetic scenarios, offline tests, optional live evaluation, and a notebook.
+> **Complete code:** [module-04/](https://github.com/faheemkhaskheli9/Customer-Support-LLM/tree/main/module-04/) — setup, source, 26 synthetic scenarios, offline tests, optional live evaluation, and a notebook.
 
 ## Module mission
 
@@ -33,7 +33,22 @@ Customer Support Assistant v0.4 adds four pieces around the Module 3 idea:
 3. A **transition function** that checks proposed changes before saving anything.
 4. An **owner-scoped store** with review, explicit correction, retention choice, expiration, and deletion.
 
-The standalone implementation lives in [module-04/](../../module-04/). Start with its [README](../../module-04/README.md) if you want to run the code while reading.
+The standalone implementation lives in [module-04/](https://github.com/faheemkhaskheli9/Customer-Support-LLM/tree/main/module-04/). Start with its [README](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/README.md) if you want to run the code while reading.
+
+### Complete code and exercises
+
+- [Run instructions and environment setup](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/README.md)
+- [State records and transition rules](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/state.py)
+- [Owner-scoped expiring memory store](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/store.py)
+- [Model router and strict JSON parser](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/router.py)
+- [Support service and safe fallback](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/service.py)
+- [Offline and optional live terminal demo](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/cli.py)
+- [Versioned routing instructions](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/prompts/state_router_v1.txt)
+- [Optional live evaluation runner](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/run_eval.py)
+- [Guided Jupyter notebook](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/notebooks/module_04_state_and_memory.ipynb)
+- [Synthetic conversation cases](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/tests/conversation_cases.jsonl) and [offline tests](https://github.com/faheemkhaskheli9/Customer-Support-LLM/tree/main/module-04/tests)
+
+Each file belongs to the standalone Module 4 folder. Open that folder in VS Code to run this module without installing Modules 1–3.
 
 ## Learning outcomes
 
@@ -77,7 +92,7 @@ class Fact:
 
 Why the source field? Because “I think my package arrived” and “the authenticated order system says delivered” have different authority. The lab records customer reports only. It never upgrades them to verified facts.
 
-See [state.py](../../module-04/src/state_lab/state.py) for the complete schema.
+See [state.py](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/state.py) for the complete schema.
 
 ## 3. Define a state transition
 
@@ -99,7 +114,7 @@ Why require the operation? It prevents an unnoticed overwrite and makes a correc
 
 The transition function first validates **all** updates on a copied state. Only after the whole proposal succeeds does the service save the new state. If a second update is invalid, the first update is not partly committed.
 
-**Checkpoint:** Run the `order_correction` and `wrong_overwrite_rejected` cases in [conversation_cases.jsonl](../../module-04/tests/conversation_cases.jsonl). Explain why their final states differ.
+**Checkpoint:** Run the `order_correction` and `wrong_overwrite_rejected` cases in [conversation_cases.jsonl](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/tests/conversation_cases.jsonl). Explain why their final states differ.
 
 ## 4. Ask for a detail, then resume
 
@@ -119,9 +134,17 @@ python -m state_lab.cli
 
 Then enter `Where is my order?`, `Order A123`, and `/state`. The default demo is scripted and free. It is intentionally narrow: it demonstrates the state flow without pretending to understand arbitrary language.
 
+To try an answer from supplied policy, load the [fictional training policy](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/data/approved_policy.txt) from the application side:
+
+~~~bash
+python -m state_lab.cli --policy-file data/approved_policy.txt
+~~~
+
+Ask `What is the return policy?`. The offline demo echoes the supplied text instead of inventing a deadline. Customer messages cannot select the policy file.
+
 ## 5. Treat model output as a proposal
 
-The router requests a JSON object with an intent, route, missing information, pending question, response draft, review flag, and fact updates. [router.py](../../module-04/src/state_lab/router.py) parses it with exact keys and types before the transition code sees it.
+The router requests a JSON object with an intent, route, missing information, pending question, response draft, review flag, and fact updates. [router.py](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/src/state_lab/router.py) parses it with exact keys and types before the transition code sees it.
 
 Valid JSON is still capable of being wrong. For example, this is shaped correctly but false:
 
@@ -164,7 +187,7 @@ Use `/state` to review the current record, `/correct order_reference B456` to co
 
 ## 8. Test the transitions offline
 
-The [25 synthetic scenarios](../../module-04/tests/conversation_cases.jsonl) cover missing order information, corrections, repeated values, forbidden overwrites, refunds and cancellations, policy gaps, prompt injection, Roman Urdu, fictional symptom intake, bad JSON, invalid fields, and contradictory output. Many scenarios span two messages.
+The [26 synthetic scenarios](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/module-04/tests/conversation_cases.jsonl) cover missing order information, corrections, repeated values, forbidden overwrites, refunds and cancellations, policy gaps, prompt injection, Roman Urdu, fictional symptom intake, bad JSON, invalid fields, and contradictory output. Many scenarios span two messages.
 
 ~~~bash
 python -m pytest -q
@@ -200,7 +223,7 @@ For assessment, focus on correctness of state and correction behavior (40%), iso
 3. Why must a guessed session ID be insufficient to read state?
 4. What does a valid JSON object fail to prove about extracted facts?
 5. What can this lab's delete operation verify, and what can it not verify?
-6. Why are the 25 scripted scenarios insufficient to claim model safety?
+6. Why are the 26 scripted scenarios insufficient to claim model safety?
 
 **Suggested answers:** A transcript retains conflicting old statements; a correction supersedes the old current value; access requires an authenticated owner as well as a session; schema validation checks shape rather than truth; deletion verifies only the local store; and scripted outputs test application logic rather than live model behavior.
 

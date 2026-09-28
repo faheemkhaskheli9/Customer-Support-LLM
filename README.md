@@ -39,4 +39,4 @@ Each module has a separate code workspace so examples, dependencies, and tests d
 
 Module 3 includes its own prompt, Python router, 24 synthetic regression cases, offline tests, command-line demo, evaluation runner, and notebook. Follow [module-03/README.md](module-03/README.md) for setup.
 
-Module 4 includes a bounded conversation-state layer, explicit corrections, owner-scoped expiring sessions, 25 fictional multi-turn scenarios, offline tests, an optional live evaluation runner, and a notebook. Follow [module-04/README.md](module-04/README.md) for setup.
+Module 4 includes a bounded conversation-state layer, explicit corrections, owner-scoped expiring sessions, 26 fictional multi-turn scenarios, offline tests, an optional live evaluation runner, and a notebook. Follow [module-04/README.md](module-04/README.md) for setup.

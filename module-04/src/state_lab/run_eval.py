@@ -28,7 +28,7 @@ def main() -> None:
         turns = []
         for turn in case["turns"]:
             result = service.turn(owner_id="synthetic-evaluation", session_id=session,
-                                  message=turn["message"])
+                                  message=turn["message"], approved_policy=case.get("approved_policy", ""))
             turns.append({"expected_route": turn["expected_route"], "actual_route": result.route,
                           "route_pass": result.status == "ok" and result.route == turn["expected_route"],
                           "status": result.status})

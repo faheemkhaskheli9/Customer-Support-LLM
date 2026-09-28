@@ -35,6 +35,14 @@ python -m state_lab.cli
 
 Try `Where is my order?`, `Order A123`, `/state`, `/correct order_reference B456`, and `/delete`. The default demo uses a deterministic scripted generator, so its language understanding is intentionally narrow. It shows state transitions without paid API calls.
 
+To test policy answers, load the fictional training policy as an application-controlled file:
+
+~~~bash
+python -m state_lab.cli --policy-file data/approved_policy.txt
+~~~
+
+Ask `What is the return policy?`. The offline demo quotes the supplied text. You can combine `--policy-file` with `--live` after configuring a model.
+
 ## Optional live model
 
 Install the extras and copy `.env.example` to `.env` within this folder. Fill `OPENAI_API_KEY` and a model your account supports. Never commit `.env`.
@@ -56,7 +64,8 @@ The live evaluation sends only synthetic messages and may incur API charges. It 
 - `src/state_lab/cli.py` — fictional offline and optional live terminal demos.
 - `src/state_lab/run_eval.py` — optional live route and fact evaluation.
 - `prompts/state_router_v1.txt` — versioned model instructions.
-- `tests/conversation_cases.jsonl` — 25 fictional scenarios; many contain multiple turns.
+- `data/approved_policy.txt` — fictional, application-supplied policy for the offline demo.
+- `tests/conversation_cases.jsonl` — 26 fictional scenarios; many contain multiple turns.
 - `tests/` — offline tests for state transitions, isolation, deletion, invalid output, and scenario integration.
 - `notebooks/module_04_state_and_memory.ipynb` — guided lab.
 
@@ -67,4 +76,4 @@ The live evaluation sends only synthetic messages and may incur API charges. It 
 - A model-proposed fact is merely a reported value. The code checks shape and transitions but cannot prove that the model extracted it correctly. User review and an authenticated data source remain necessary.
 - A nonempty approved policy allows an answer route, but the code cannot prove the draft faithfully quotes that policy. Module 5 adds retrieval and citation checks.
 - The model cannot complete actions. Handoff and unsupported replies come from application code, regardless of model prose.
-- Live evaluation on 25 synthetic cases is not a clinical, security, privacy, or production validation.
+- Live evaluation on 26 synthetic cases is not a clinical, security, privacy, or production validation.

@@ -1,4 +1,4 @@
-"""25 synthetic scenarios test multi-turn integration, not LLM accuracy."""
+"""Synthetic scenarios test multi-turn integration, not LLM accuracy."""
 
 import json
 from pathlib import Path
@@ -28,7 +28,8 @@ def test_synthetic_conversation(case):
     service = SupportService(MemoryStore(), SupportRouter(ScriptedGenerator(case["turns"])))
     sid = service.start(owner_id="synthetic-user")["session_id"]
     for turn in case["turns"]:
-        result = service.turn(owner_id="synthetic-user", session_id=sid, message=turn["message"])
+        result = service.turn(owner_id="synthetic-user", session_id=sid,
+                              message=turn["message"], approved_policy=case.get("approved_policy", ""))
         assert result.status == turn["expected_status"]
         assert result.route == turn["expected_route"]
     state = service.review(owner_id="synthetic-user", session_id=sid)
