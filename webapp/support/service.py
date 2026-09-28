@@ -45,12 +45,14 @@ def process_turn(*, stage: int, message: str, session, gateway: Gateway,
     if len(policy) > 8000:
         raise ValueError("Approved policy is too long")
     started = time.perf_counter()
-    history = list(session.get("m2_history", []))[-MAX_HISTORY:] if stage == 2 else []
+    history_key = "m2_history" if stage == 2 else "m3_history" if stage == 3 else None
+    history = list(session.get(history_key, []))[-MAX_HISTORY:] if history_key else []
     messages = history + [{"role": "user", "content": message}]
     state = active_state(session) if stage == 4 else None
     if stage == 4:
         # Module 4 does not retain earlier raw transcript history.
         session.pop("m2_history", None)
+        session.pop("m3_history", None)
 
     try:
         generated = gateway.generate(stage=stage, messages=messages, policy=policy, state=state)
@@ -66,6 +68,8 @@ def process_turn(*, stage: int, message: str, session, gateway: Gateway,
                 updated = apply_proposal(state, proposal, policy)
                 session["m4_state"] = updated
             answer, route = customer_response(proposal), proposal["route"]
+            if stage == 3:
+                session["m3_history"] = (messages + [{"role": "assistant", "content": answer}])[-MAX_HISTORY:]
         return Turn("ok", answer, route, generated.model,
                     round((time.perf_counter() - started) * 1000, 2),
                     generated.input_tokens, generated.output_tokens)

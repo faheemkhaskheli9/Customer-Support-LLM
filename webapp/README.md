@@ -4,7 +4,7 @@ This Django app is the active code for Modules 1–4. Select a module in the top
 
 1. **Module 1:** one model call, support instructions, latency and token usage.
 2. **Module 2:** bounded multi-turn context; failed calls do not corrupt history.
-3. **Module 3:** four support routes, strict JSON validation, and an offline regression button.
+3. **Module 3:** four support routes on bounded context, strict JSON validation, and an offline regression button.
 4. **Module 4:** reported facts, corrections, browser-session isolation, retention choice, expiry, and deletion.
 
 The older `module-01/` through `module-04/` directories remain as historical CLI companions so published links keep working. New course features belong here.
@@ -53,6 +53,6 @@ The browser-level tests cover all four stages, CSRF protection, session isolatio
 
 ## Boundaries
 
-Use fictional data only. This prototype has no user account system, order API, clinical validation, or durable product database. Django isolates sessions by browser cookie, not by verified customer identity. Module 4 saves structured reported facts in the server-side session and removes earlier Module 2 raw history when entering Module 4. Session data can remain in SQLite until expiry or cleanup even after the browser closes. Deletion removes this prototype's session keys; it cannot assert anything about external logs or backups.
+Use fictional data only. This prototype has no user account system, order API, clinical validation, or durable product database. Django isolates sessions by browser cookie, not by verified customer identity. Module 4 saves structured reported facts in the server-side session and removes earlier Module 2 and Module 3 raw history when entering Module 4. Session data can remain in SQLite until expiry or cleanup even after the browser closes. Deletion removes this prototype's session keys; it cannot assert anything about external logs or backups.
 
 The application cannot complete refunds, cancellations, or medical decisions. Schema validation checks shape, not whether a model extracted a true fact. Module 5 will add approved retrieval and citations.

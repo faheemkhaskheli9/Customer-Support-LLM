@@ -58,18 +58,29 @@ class CourseWebTests(TestCase):
         self.client.post("/chat/3/", {"message": "Cancel my order"})
         page = self.client.get("/?stage=3")
         self.assertContains(page, "No action has been completed")
+        self.assertEqual(len(self.client.session["m3_history"]), 4)
         with patch("support.views.get_gateway", return_value=BadJSONGateway()):
             self.client.post("/chat/3/", {"message": "Return policy?"})
         self.assertContains(self.client.get("/?stage=3"), "cannot process that safely")
+        self.assertEqual(len(self.client.session["m3_history"]), 4)
         self.client.post("/evaluation/")
         page = self.client.get("/?stage=3")
         self.assertContains(page, "OFFLINE REGRESSION")
         self.assertContains(page, "24 expected routes")
 
+    def test_module_3_keeps_short_context_for_clarification(self):
+        self.client.post("/chat/3/", {"message": "Where is my order?"})
+        self.assertEqual(self.client.session["m3_history"][-1]["content"], "What is the order number?")
+        self.client.post("/chat/3/", {"message": "A123"})
+        self.assertEqual(len(self.client.session["m3_history"]), 4)
+        self.assertEqual(self.client.session["last_result"]["route"], "handoff")
+
     def test_module_4_asks_resumes_corrects_and_drops_raw_history(self):
         self.client.post("/chat/2/", {"message": "Earlier private message"})
+        self.client.post("/chat/3/", {"message": "Earlier route message"})
         self.client.post("/chat/4/", {"message": "Where is my order?"})
         self.assertNotIn("m2_history", self.client.session)
+        self.assertNotIn("m3_history", self.client.session)
         self.assertEqual(self.client.session["m4_state"]["pending_question"], "What is the order number?")
         self.client.post("/chat/4/", {"message": "A123"})
         self.assertEqual(self.client.session["m4_state"]["current_facts"]["order_reference"]["value"], "A123")

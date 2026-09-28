@@ -31,9 +31,10 @@ def home(request):
     state = active_state(request.session) if stage == 4 else None
     if stage == 4:
         request.session.pop("m2_history", None)
+        request.session.pop("m3_history", None)
     return render(request, "support/home.html", {
         "stage": stage, "stages": STAGES, "stage_title": STAGES[stage][0],
-        "history": request.session.get("m2_history", []) if stage == 2 else [],
+        "history": request.session.get("m2_history", []) if stage == 2 else request.session.get("m3_history", []) if stage == 3 else [],
         "state": state, "result": request.session.pop("last_result", None),
         "evaluation": request.session.pop("evaluation", None),
         "notice": request.session.pop("notice", None),
@@ -95,6 +96,7 @@ def retention(request):
 def delete_state(request):
     request.session.pop("m4_state", None)
     request.session.pop("m2_history", None)
+    request.session.pop("m3_history", None)
     request.session.pop("last_result", None)
     request.session["notice"] = "Course session state removed from this server-side session."
     return redirect("/?stage=4")
@@ -104,6 +106,8 @@ def delete_state(request):
 def reset(request, stage: int):
     if stage == 2:
         request.session.pop("m2_history", None)
+    elif stage == 3:
+        request.session.pop("m3_history", None)
     elif stage == 4:
         request.session.pop("m4_state", None)
     request.session.pop("last_result", None)

@@ -58,5 +58,9 @@ def customer_response(route: dict) -> str:
     if route["route"] == "unsupported":
         return "I do not have approved information to answer that request."
     if route["route"] == "ask_clarifying_question":
-        return route.get("pending_question") or "Please share the missing information so support can continue."
+        if route.get("pending_question"):
+            return route["pending_question"]
+        if "order_reference" in route["missing_information"]:
+            return "What is the order number?"
+        return "Please share the missing information so support can continue."
     return route["response_draft"]
