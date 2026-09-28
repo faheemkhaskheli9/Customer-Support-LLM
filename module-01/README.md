@@ -1,5 +1,7 @@
 # Module 1 — Build Your First Customer-Support LLM
 
+> **Historical CLI companion.** The active Modules 1–4 course code is the [shared Django web app](../webapp/). This folder stays available for older published links.
+
 This is the standalone code companion for Module 1. It contains its own Python package, notebook, and offline tests. It does not import code from Modules 2 or 3.
 
 You will build a small command-line assistant, compare a raw model with support instructions, and record what the first version can and cannot do.

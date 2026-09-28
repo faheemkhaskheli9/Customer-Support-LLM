@@ -1,0 +1,83 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Support LLM · Course App</title>
+  <link rel="stylesheet" href="{% static 'support.css' %}">
+</head>
+<body>
+  <div class="shell">
+    <header class="site-header">
+      <div><p class="eyebrow">BUILD → BREAK → MEASURE → IMPROVE</p><h1>Customer Support LLM</h1>
+        <p class="subtitle">One web app. Four steps from first model call to safe conversation state.</p></div>
+      <span class="badge">Fictional data only</span>
+    </header>
+
+    <nav class="modules" aria-label="Course modules">
+      {% for number, description in stages.items %}
+      <a class="module {% if number == stage %}active{% endif %}" href="/?stage={{ number }}" {% if number == stage %}aria-current="page"{% endif %}>
+        <span class="step">0{{ number }}</span><strong>{{ description.0 }}</strong><small>{{ description.1 }}</small>
+      </a>
+      {% endfor %}
+    </nav>
+
+    <main class="grid">
+      <section class="panel conversation" aria-labelledby="workspace-title">
+        <div class="panel-head"><div><p class="eyebrow">MODULE 0{{ stage }}</p><h2 id="workspace-title">{{ stage_title }}</h2></div>
+          <form method="post" action="{% url 'reset' stage %}">{% csrf_token %}<button class="secondary" type="submit">Reset module</button></form>
+        </div>
+        {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+        {% if stage == 1 %}<p class="explain">Send one message. This stage does not remember previous turns or access company records.</p>{% endif %}
+        {% if stage == 2 %}<p class="explain">The last four exchanges remain in this browser session. The assistant can use that short context.</p>{% endif %}
+        {% if stage == 3 %}<p class="explain">A fixed route and validated JSON turn each message into a support decision. No action tool is available.</p>{% endif %}
+        {% if stage == 4 %}<p class="explain">Review and correct reported facts. A browser session is isolated, expires after 30 minutes, and stores no full Module 4 transcript.</p>{% endif %}
+
+        {% if history %}<div class="history" aria-label="Recent conversation">
+          {% for item in history %}<p class="bubble {{ item.role }}"><strong>{{ item.role|title }}</strong><br>{{ item.content }}</p>{% endfor %}
+        </div>{% endif %}
+        {% if result %}<div class="result" role="status"><span class="label">{{ result.status|upper }} · {{ result.route }}</span>
+          <p>{{ result.response }}</p><small>Model: {{ result.model }} · {{ result.latency_ms }} ms · Input tokens: {{ result.input_tokens|default:"—" }} · Output tokens: {{ result.output_tokens|default:"—" }}</small>
+        </div>{% endif %}
+        {% if stage == 3 %}<form method="post" action="{% url 'evaluate' %}">{% csrf_token %}<button class="secondary" type="submit">Run offline routing evaluation</button></form>{% endif %}
+        {% if evaluation %}<div class="result" role="status"><span class="label">OFFLINE REGRESSION</span>
+          <p>{{ evaluation.matched }} / {{ evaluation.total }} expected routes · {{ evaluation.schema_valid }} valid schemas</p>
+          {% for failure in evaluation.failures %}<small>{{ failure.id }}: expected {{ failure.expected }}, got {{ failure.actual }}<br></small>{% endfor %}
+        </div>{% endif %}
+        <form class="chat-form" method="post" action="{% url 'chat' stage %}">{% csrf_token %}
+          <label for="message">Customer message</label>
+          <textarea id="message" name="message" required maxlength="4000" rows="4" placeholder="{% if stage == 4 %}Where is my order?{% elif stage == 3 %}What is the return policy?{% else %}How can you help with my order?{% endif %}"></textarea>
+          <div class="form-foot"><small>Do not enter real customer or patient data.</small><button type="submit">Send message</button></div>
+        </form>
+      </section>
+
+      <aside class="panel details" aria-label="Module details">
+        <p class="eyebrow">WHAT THIS STAGE ADDS</p>
+        {% if stage == 1 %}<h2>First response</h2><p>Trusted support instructions, one model call, and response metrics. Compare an unsupported policy answer with a focused clarification.</p>
+          <p class="hint">Try: “What is your warranty period?”</p>{% endif %}
+        {% if stage == 2 %}<h2>Conversation context</h2><p>Messages are committed only after a successful response. The app keeps a bounded history in the server-side session.</p>
+          <p class="hint">Try: “My order is A123”, then “What is my order number?”</p>{% endif %}
+        {% if stage == 3 %}<h2>Structured routing</h2><p>Valid routes are answer from approved information, clarify, handoff, or unsupported. An invalid model result fails safely.</p>
+          <p class="hint">Try: “Cancel my order” and “What is the return policy?”</p>{% endif %}
+        {% if stage == 4 %}<h2>Current state</h2>
+          <dl class="state-list"><dt>Pending question</dt><dd>{{ state.pending_question|default:"None" }}</dd><dt>Route</dt><dd>{{ state.last_route|default:"None" }}</dd>
+          <dt>Retention</dt><dd>{{ state.retention_choice }}</dd><dt>Expires</dt><dd>{{ state.expires_at }}</dd></dl>
+          <h3>Reported facts</h3>
+          {% if state.current_facts %}{% for key, fact in state.current_facts.items %}<div class="fact"><strong>{{ key }}</strong><span>{{ fact.value }}</span><small>Customer reported · event {{ fact.source_event_id }}</small></div>{% endfor %}
+          {% else %}<p class="muted">No reported facts yet.</p>{% endif %}
+          <form class="compact-form" method="post" action="{% url 'correct' %}">{% csrf_token %}
+            <label for="fact-key">Correct a reported fact</label><select id="fact-key" name="key" required>{% for key, fact in state.current_facts.items %}<option value="{{ key }}">{{ key }}</option>{% endfor %}</select>
+            <input name="value" aria-label="Corrected value" maxlength="200" required placeholder="Correct value"><button type="submit">Save correction</button>
+          </form>
+          <form class="compact-form" method="post" action="{% url 'retention' %}">{% csrf_token %}<label for="retention-choice">Retention preference</label>
+            <select id="retention-choice" name="choice"><option value="session_only" {% if state.retention_choice == 'session_only' %}selected{% endif %}>This browser session</option><option value="until_expiry" {% if state.retention_choice == 'until_expiry' %}selected{% endif %}>Until expiry in this server</option></select><button class="secondary" type="submit">Update</button></form>
+          <form method="post" action="{% url 'delete_state' %}">{% csrf_token %}<button class="danger" type="submit">Delete session data</button></form>
+        {% endif %}
+        {% if policy %}<details class="policy"><summary>Approved fictional policy</summary><p>{{ policy|linebreaksbr }}</p></details>{% endif %}
+        <p class="disclaimer">Teaching prototype. It cannot verify identity, complete business actions, or make medical decisions.</p>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

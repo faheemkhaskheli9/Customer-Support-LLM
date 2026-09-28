@@ -5,6 +5,8 @@
 > **Level:** Beginner to practical LLM engineering  
 > **Learning loop:** Build → Break → Measure → Improve
 
+**Current implementation:** Module 4 extends the shared [Django web app](../../webapp/) through `webapp/support/state.py`, `routing.py`, `service.py`, and `views.py`. The separate `module-04/` paths below describe the archived CLI companion.
+
 ## Module mission
 
 Module 3 produced a validated support route for one message. A conversation needs more: the assistant must remember what the customer actually said, ask for missing details, accept corrections, and avoid mixing one person's information with another's. Memory introduces privacy and reliability risks, so this module makes state explicit, bounded, and testable.

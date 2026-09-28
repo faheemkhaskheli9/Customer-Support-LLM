@@ -1,5 +1,7 @@
 # Module 4 — Conversation State and Safe Memory
 
+> **Historical CLI companion.** The active Modules 1–4 course code is the [shared Django web app](../webapp/). This folder stays available for older published links.
+
 Standalone code companion for the [Module 4 tutorial](../knowledge-base/modules/module-04.md). Module 4 does not import code from earlier folders. It carries forward Module 3's route names and strict JSON boundary.
 
 This is a fictional support lab. It does not perform refunds or order changes and is not a clinical system. The local store is process memory only; it is not a durable database, authentication service, or production privacy solution.

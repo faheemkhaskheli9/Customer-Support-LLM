@@ -18,4 +18,4 @@ Corrections supersede prior values, deletion and expiry clear the prototype's ow
 
 ## Full outline
 
-See [Module 4 outline](module-04-outline.md). Structured output and schema validation were introduced in Module 3 and are applied to state here.
+See [Module 4 outline](module-04-outline.md) and the [shared Django app](../../webapp/). Structured output and schema validation were introduced in Module 3 and are applied to state here.

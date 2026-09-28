@@ -5,6 +5,8 @@
 > **Level:** Beginner to practical LLM engineering  
 > **Learning loop:** Build → Break → Measure → Improve
 
+**Current implementation:** This module adds structured routing and evaluation to the shared [Django web app](../../webapp/). File paths below describing a separate `module-03/` package belong to the archived CLI exercise; use `webapp/support/gateway.py`, `routing.py`, and `evaluation.py` for the active course.
+
 ## Module mission
 
 A prompt is part of the application’s behavior. It needs clear requirements, predictable inputs and outputs, version control, tests, and safe failure behavior. In this module, learners replace one-off instructions with reusable prompt templates and a small regression suite for common customer-support tasks.
