@@ -35,5 +35,8 @@ Each module has a separate code workspace so examples, dependencies, and tests d
 - [Module 1 lesson](docs/module-01.md) · [Module 1 standalone code, notebook, and tests](module-01/)
 - [Module 2 lesson](docs/module-02.md) · [Module 2 standalone code, notebook, and tests](module-02/)
 - [Module 3 lesson](knowledge-base/modules/module-03.md) · [Module 3 complete code package](module-03/)
+- [Module 4 lesson](knowledge-base/modules/module-04.md) · [Module 4 standalone state, tests, and notebook](module-04/)
 
 Module 3 includes its own prompt, Python router, 24 synthetic regression cases, offline tests, command-line demo, evaluation runner, and notebook. Follow [module-03/README.md](module-03/README.md) for setup.
+
+Module 4 includes a bounded conversation-state layer, explicit corrections, owner-scoped expiring sessions, 25 fictional multi-turn scenarios, offline tests, an optional live evaluation runner, and a notebook. Follow [module-04/README.md](module-04/README.md) for setup.

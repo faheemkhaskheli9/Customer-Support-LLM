@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "customer-support-llm-module-04"
+version = "0.1.0"
+description = "Standalone stateful customer support lab"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+live = ["openai>=1.0.0", "python-dotenv>=1.0.0"]
+dev = ["pytest>=8.0.0"]
+
+[project.scripts]
+module-04-demo = "state_lab.cli:main"
+module-04-eval = "state_lab.run_eval:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
