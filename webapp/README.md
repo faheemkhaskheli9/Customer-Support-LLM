@@ -7,6 +7,13 @@ This Django app is the active code for Modules 1–4. Select a module in the top
 3. **Module 3:** four support routes on bounded context, strict JSON validation, and an offline regression button.
 4. **Module 4:** reported facts, corrections, browser-session isolation, retention choice, expiry, and deletion.
 
+The home page is the **Support agent**, which has every module's feature in one conversation (`agent_turn` in `support/service.py`). It works in two steps:
+
+1. Each message is routed through the Module 4 contract. That step validates the JSON, updates reported facts, and returns fixed replies from code for handoff, unsupported and clarification.
+2. When the route is an approved-policy answer, a second model call writes the reply from the policy, the recent agent conversation and the reported facts.
+
+Every reply shows its model metrics. Fact corrections, retention and deletion work on the same page.
+
 The older `module-01/` through `module-04/` directories remain as historical CLI companions so published links keep working. New course features belong here.
 
 ## Run locally

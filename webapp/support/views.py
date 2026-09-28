@@ -9,32 +9,40 @@ from django.views.decorators.http import require_POST
 
 from .gateway import get_gateway
 from .evaluation import run_offline_evaluation
-from .service import active_state, process_turn
+from .service import active_state, agent_turn, process_turn
 from .state import correct_fact, is_expired
 
 POLICY = (Path(__file__).resolve().parents[1] / "data" / "approved_policy.txt").read_text(encoding="utf-8")
-STAGES = {
+AGENT = 5
+STAGES = {  # insertion order is nav order: the main agent first, then the lessons
+    AGENT: ("Support agent", "All four modules in one conversation"),
     1: ("First model call", "One message, support rules, and usage measurements"),
     2: ("Multi-turn chat", "Bounded conversation context and controlled failures"),
     3: ("Prompt routing", "Versioned instructions, validated JSON, and handoff routes"),
     4: ("Safe memory", "Fact corrections, review, retention, expiry, and deletion"),
 }
+HISTORY_KEYS = {2: "m2_history", 3: "m3_history", AGENT: "agent_history"}
+
+
+def back(request):
+    """State forms are shared by Module 4 and the agent; return to whichever sent them."""
+    return redirect(f"/?stage={AGENT if request.POST.get('stage') == str(AGENT) else 4}")
 
 
 def home(request):
     try:
-        stage = int(request.GET.get("stage", "1"))
+        stage = int(request.GET.get("stage", AGENT))
     except ValueError:
-        stage = 1
+        stage = AGENT
     if stage not in STAGES:
-        stage = 1
-    state = active_state(request.session) if stage == 4 else None
+        stage = AGENT
+    state = active_state(request.session) if stage in (4, AGENT) else None
     if stage == 4:
         request.session.pop("m2_history", None)
         request.session.pop("m3_history", None)
     return render(request, "support/home.html", {
-        "stage": stage, "stages": STAGES, "stage_title": STAGES[stage][0],
-        "history": request.session.get("m2_history", []) if stage == 2 else request.session.get("m3_history", []) if stage == 3 else [],
+        "stage": stage, "stages": STAGES, "stage_title": STAGES[stage][0], "agent": AGENT,
+        "history": request.session.get(HISTORY_KEYS.get(stage, ""), []),
         "state": state, "result": request.session.pop("last_result", None),
         "evaluation": request.session.pop("evaluation", None),
         "notice": request.session.pop("notice", None),
@@ -47,9 +55,13 @@ def chat(request, stage: int):
     if stage not in STAGES:
         return redirect("home")
     try:
-        turn = process_turn(stage=stage, message=request.POST.get("message", ""),
-                            session=request.session, gateway=get_gateway(),
-                            policy=POLICY if stage >= 3 else "")
+        if stage == AGENT:
+            turn = agent_turn(message=request.POST.get("message", ""), session=request.session,
+                              gateway=get_gateway(), policy=POLICY)
+        else:
+            turn = process_turn(stage=stage, message=request.POST.get("message", ""),
+                                session=request.session, gateway=get_gateway(),
+                                policy=POLICY if stage >= 3 else "")
         request.session["last_result"] = turn.as_dict()
     except (ValueError, RuntimeError) as exc:
         request.session["notice"] = str(exc)
@@ -75,7 +87,7 @@ def correct(request):
             request.session["notice"] = "Reported fact corrected."
         except ValueError as exc:
             request.session["notice"] = str(exc)
-    return redirect("/?stage=4")
+    return back(request)
 
 
 @require_POST
@@ -89,7 +101,7 @@ def retention(request):
         request.session["notice"] = "Retention preference updated for this browser session."
     else:
         request.session["notice"] = "Invalid retention choice."
-    return redirect("/?stage=4")
+    return back(request)
 
 
 @require_POST
@@ -97,9 +109,10 @@ def delete_state(request):
     request.session.pop("m4_state", None)
     request.session.pop("m2_history", None)
     request.session.pop("m3_history", None)
+    request.session.pop("agent_history", None)
     request.session.pop("last_result", None)
     request.session["notice"] = "Course session state removed from this server-side session."
-    return redirect("/?stage=4")
+    return back(request)
 
 
 @require_POST
@@ -108,7 +121,9 @@ def reset(request, stage: int):
         request.session.pop("m2_history", None)
     elif stage == 3:
         request.session.pop("m3_history", None)
-    elif stage == 4:
+    elif stage in (4, AGENT):
         request.session.pop("m4_state", None)
+        if stage == AGENT:
+            request.session.pop("agent_history", None)
     request.session.pop("last_result", None)
-    return redirect(f"/?stage={stage if stage in STAGES else 1}")
+    return redirect(f"/?stage={stage if stage in STAGES else AGENT}")

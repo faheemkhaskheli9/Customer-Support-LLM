@@ -1,12 +1,13 @@
 """End-to-end checks for the evolving web app, without paid model calls."""
 
+import json
 from datetime import timedelta
 from unittest.mock import patch
 
 from django.test import Client, TestCase
 from django.utils import timezone
 
-from .gateway import Generation
+from .gateway import Generation, OfflineGateway
 from .service import process_turn
 
 
@@ -123,3 +124,47 @@ class CourseWebTests(TestCase):
         page = self.client.get("/?stage=4")
         self.assertContains(page, "support professional")
         self.assertEqual(self.client.session["m4_state"]["current_facts"]["reported_symptom"]["source"], "reported_by_customer")
+
+    def test_agent_is_the_default_page(self):
+        self.assertContains(self.client.get("/"), "MODULES 01–04")
+
+    def test_agent_routes_remembers_facts_and_answers_with_context(self):
+        self.client.post("/chat/5/", {"message": "Where is my order?"})
+        self.assertEqual(self.client.session["last_result"]["route"], "ask_clarifying_question")
+        self.client.post("/chat/5/", {"message": "A123"})
+        self.assertEqual(self.client.session["m4_state"]["current_facts"]["order_reference"]["value"], "A123")
+        self.assertIn("No action has been completed", self.client.session["last_result"]["response"])
+
+        calls = []
+        real = OfflineGateway()
+
+        class Recording:
+            def generate(self, **kwargs):
+                calls.append(kwargs)
+                return real.generate(**kwargs)
+
+        with patch("support.views.get_gateway", return_value=Recording()):
+            self.client.post("/chat/5/", {"message": "What is the return policy?"})
+        page = self.client.get("/?stage=5")
+        self.assertContains(page, "30 days")
+        self.assertContains(page, "answer_from_approved_info")
+        self.assertEqual([c["stage"] for c in calls], [4, 5])
+        history, latest = calls[1]["messages"][:-1], json.loads(calls[1]["messages"][-1]["content"])
+        self.assertEqual(history[0], {"role": "user", "content": "Where is my order?"})
+        self.assertEqual(latest["reported_facts"], {"order_reference": "A123"})
+        self.assertEqual(len(self.client.session["agent_history"]), 6)
+
+        self.client.post("/state/correct/", {"key": "order_reference", "value": "B456", "stage": "5"})
+        self.assertEqual(self.client.session["m4_state"]["current_facts"]["order_reference"]["value"], "B456")
+        response = self.client.post("/state/delete/", {"stage": "5"})
+        self.assertEqual(response["Location"], "/?stage=5")
+        self.assertNotIn("agent_history", self.client.session)
+        self.assertNotIn("m4_state", self.client.session)
+
+    def test_agent_failed_turn_is_not_committed(self):
+        self.client.post("/chat/5/", {"message": "Where is my order?"})
+        with patch("support.views.get_gateway", return_value=BadJSONGateway()):
+            self.client.post("/chat/5/", {"message": "A123"})
+        self.assertEqual(self.client.session["last_result"]["status"], "error")
+        self.assertEqual(len(self.client.session["agent_history"]), 2)
+        self.assertEqual(self.client.session["m4_state"]["current_facts"], {})
