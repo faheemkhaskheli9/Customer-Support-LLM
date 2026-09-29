@@ -1,0 +1,187 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python Debugger: Django",
+      "type": "debugpy",
+      "request": "launch",
+      "args": [
+        "runserver"
+      ],
+      "django": true,
+      "autoStartBrowser": false,
+      "program": "${workspaceFolder}\\webapp\\manage.py",
+      "cwd": "${workspaceFolder}/webapp",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/webapp/src"
+      },
+    },
+    {
+      "name": "Module 1: support-basics chat",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "support_basics.cli",
+      "cwd": "${workspaceFolder}/module-01",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-01/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Module 2: healthcare-chat",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "customer_support.cli",
+      "cwd": "${workspaceFolder}/module-02",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-02/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Module 3: prompt chat",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "prompt_lab.cli",
+      "cwd": "${workspaceFolder}/module-03",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-03/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Module 3: live eval (costs money)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "prompt_lab.run_eval",
+      "args": [
+        "--cases",
+        "tests/prompt_cases.jsonl",
+        "--output",
+        "reports/module-03-results.json"
+      ],
+      "cwd": "${workspaceFolder}/module-03",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-03/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Module 4: offline demo",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "state_lab.cli",
+      "cwd": "${workspaceFolder}/module-04",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-04/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Module 4: demo with policy file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "state_lab.cli",
+      "args": [
+        "--policy-file",
+        "data/approved_policy.txt"
+      ],
+      "cwd": "${workspaceFolder}/module-04",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-04/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Module 4: live demo (costs money)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "state_lab.cli",
+      "args": [
+        "--live"
+      ],
+      "cwd": "${workspaceFolder}/module-04",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-04/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Module 4: live eval (costs money)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "state_lab.run_eval",
+      "args": [
+        "--cases",
+        "tests/conversation_cases.jsonl",
+        "--output",
+        "reports/module-04-live-results.json"
+      ],
+      "cwd": "${workspaceFolder}/module-04",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module-04/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Webapp: uvicorn --reload",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "support_app.app:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000",
+        "--reload"
+      ],
+      "cwd": "${workspaceFolder}/webapp",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/webapp/src"
+      },
+      "console": "integratedTerminal",
+      "jinja": true
+    },
+    {
+      "name": "Debug tests: pick module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-q"
+      ],
+      "cwd": "${workspaceFolder}/${input:project}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Debug tests: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-q",
+        "${file}"
+      ],
+      "cwd": "${fileDirname}/..",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ],
+  "inputs": [
+    {
+      "id": "project",
+      "type": "pickString",
+      "description": "Which workspace to test",
+      "options": [
+        "module-01",
+        "module-02",
+        "module-03",
+        "module-04",
+        "webapp"
+      ],
+      "default": "module-04"
+    }
+  ]
+}
