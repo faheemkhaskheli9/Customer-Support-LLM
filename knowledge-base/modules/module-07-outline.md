@@ -5,7 +5,7 @@
 > **Level:** Beginner to practical LLM engineering  
 > **Learning loop:** Build → Break → Measure → Improve
 
-**Implementation:** Module 7 extends the shared [Django web app](../../webapp/) with the page at `/?stage=7` (`health_turn` in `support/service.py`, the safety layer in `support/health.py`).
+**Implementation:** Module 7 extends the shared [Django web app](../../webapp/) with the page at `/?stage=7` (`health_turn` in `support/service.py`, the safety layer in `support/health.py`). The article is [module-07.md](module-07.md).
 
 ## Module mission
 
