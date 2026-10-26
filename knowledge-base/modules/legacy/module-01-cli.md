@@ -340,4 +340,4 @@ This is a learning baseline, not a production-readiness threshold.
 
 Module 2 turns the experiment into a structured healthcare customer-support application. You will add conversation state, input validation, an interchangeable model interface, controlled errors, and tests that do not spend API credits.
 
-[Continue to Module 2](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/docs/module-02.md)
+[Continue to Module 2](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/knowledge-base/modules/legacy/module-02-cli.md)
