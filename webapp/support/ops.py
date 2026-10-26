@@ -14,7 +14,7 @@ from .tools import load_orders
 
 BACKENDS = ("offline", "openai")
 RETRIEVAL_MODES = ("keyword", "hybrid")
-TABLES = ("django_session", "support_feedback")  # sessions and the Module 8 feedback log
+TABLES = ("django_session", "support_feedback", "support_handoff")  # sessions, feedback and handoff logs
 # Symptom → first action. Kept in code so the page, the command and the article quote one list.
 RUNBOOK = (
     ("/readyz is 503 on a config check",

@@ -8,7 +8,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
-from . import feedback
+from . import feedback, handoffs
 from .gateway import get_gateway
 from .ops import RUNBOOK, readiness
 from .report import run_report, to_markdown
@@ -84,6 +84,7 @@ def home(request):
         "readiness": readiness() if stage == DEPLOY_STAGE else None, "runbook": RUNBOOK,
         # Customer ratings sit next to the report but never change its verdict.
         "feedback": feedback.summary() if stage == REPORT_STAGE else None, "ratings": feedback.RATINGS,
+        "handoffs": handoffs.summary() if stage == REPORT_STAGE else None,
     })
 
 
@@ -125,6 +126,7 @@ def chat(request, stage: int):
         result = turn.as_dict()
         if stage == AGENT:
             result["feedback_id"] = feedback.offer(request.session, turn)
+            result["handoff_ref"] = handoffs.open_handoff(request.session, turn)
         request.session["last_result"] = result
     except (ValueError, RuntimeError) as exc:
         request.session["notice"] = str(exc)
@@ -227,6 +229,7 @@ def delete_state(request):
     request.session.pop("m3_history", None)
     request.session.pop("agent_history", None)
     request.session.pop(feedback.PENDING_KEY, None)
+    request.session.pop(handoffs.SESSION_KEY, None)
     request.session.pop("last_result", None)
     request.session.pop("region", None)
     for key in ("customer", "m6_lookups", "tool_audit"):
@@ -246,6 +249,7 @@ def reset(request, stage: int):
         if stage == AGENT:
             request.session.pop("agent_history", None)
             request.session.pop(feedback.PENDING_KEY, None)
+            request.session.pop(handoffs.SESSION_KEY, None)
     if stage in TOOL_STAGES:
         request.session.pop("tool_audit", None)
     request.session.pop("last_result", None)
