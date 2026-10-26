@@ -17,7 +17,7 @@ from .retrieval import Retriever, get_retriever, tokens
 from .routing import parse_grounded
 from .service import agent_turn, health_turn, process_turn, rag_turn, tool_turn
 from .evaluation import run_health_evaluation, run_tool_evaluation
-from .health import get_clinic_retriever, parse_triage, screen
+from .health import REPLIES as HEALTH_REPLIES, get_clinic_retriever, parse_triage, screen
 from .tools import MAX_LOOKUPS, get_orders, load_orders, parse_tool_request
 
 
@@ -181,7 +181,7 @@ class CourseWebTests(TestCase):
         self.assertEqual(self.client.session["m4_state"]["current_facts"]["reported_symptom"]["source"], "reported_by_customer")
 
     def test_agent_is_the_default_page(self):
-        self.assertContains(self.client.get("/"), "MODULES 01–06")
+        self.assertContains(self.client.get("/"), "MODULES 01–07")
 
     def test_agent_routes_remembers_facts_and_answers_with_context(self):
         self.client.post("/chat/0/", {"message": "Where is my order?"})
@@ -615,3 +615,22 @@ class Module7HealthTests(TestCase):
         self.assertNotIn("fever", json.dumps(dict(self.client.session.items())))
         self.client.post("/evaluation/health/")
         self.assertContains(self.client.get("/?stage=7"), "SAFETY EVALUATION · 20 CASES")
+
+    def test_agent_screens_before_any_model_call_and_keeps_nothing(self):
+        session = {}
+        for message, category in (("I have chest pain and my order ORD-1001 is late.", "emergency"),
+                                  ("I have a rash. Which cream should I order?", "clinical")):
+            recording = Recording()
+            turn = agent_turn(message=message, session=session, gateway=recording)
+            self.assertEqual(recording.calls, [])
+            self.assertEqual((turn.route, turn.model, turn.safety["category"]), ("handoff", "not called", category))
+            self.assertEqual(turn.response, HEALTH_REPLIES[category])
+        self.assertEqual(session, {})  # no history, no reported facts, no symptom
+
+    def test_agent_page_shows_the_safety_panel(self):
+        self.client.post("/chat/0/", {"message": "I have had a fever for three days."})
+        page = self.client.get("/")
+        self.assertContains(page, "SAFETY · clinical")
+        self.assertNotIn("fever", json.dumps(dict(self.client.session.items())))
+        self.client.post("/chat/0/", {"message": "Where is my order?"})
+        self.assertNotContains(self.client.get("/"), "SAFETY ·")

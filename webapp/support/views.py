@@ -17,7 +17,7 @@ from .tools import get_orders
 POLICY = (Path(__file__).resolve().parents[1] / "data" / "approved_policy.txt").read_text(encoding="utf-8")
 AGENT = 0
 STAGES = {  # insertion order is nav order: the main agent first, then the lessons
-    AGENT: ("Support agent", "All six modules in one conversation"),
+    AGENT: ("Support agent", "All seven modules in one conversation"),
     1: ("First model call", "One message, support rules, and usage measurements"),
     2: ("Multi-turn chat", "Bounded conversation context and controlled failures"),
     3: ("Prompt routing", "Versioned instructions, validated JSON, and handoff routes"),

@@ -1,4 +1,4 @@
-"""Replaceable text generator shared by all six teaching stages."""
+"""Replaceable text generator shared by all seven teaching stages."""
 
 from __future__ import annotations
 

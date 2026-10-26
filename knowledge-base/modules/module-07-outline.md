@@ -30,7 +30,8 @@ The design puts a deterministic screen in code before any model call. An emergen
 6. Answer clinic admin questions only from approved clinic documents (`CLN-*`), through a clinic-only retriever, with citations from metadata; a miss replies from code without calling the answer model.
 7. Keep no conversation history and no reported facts on the page, so a symptom is never stored.
 8. Show a safety panel with the code screen, the model proposal and the final category.
-9. Evaluate categories, emergency recall, model calls on screened emergencies, answers outside clinic admin and admin citations over a 20-case frozen set (`data/health_cases.jsonl`).
+9. Run the same screen first in the home-page support agent: an emergency or clinical message gets the code-written reply, calls no model and stores no history or reported facts.
+10. Evaluate categories, emergency recall, model calls on screened emergencies, answers outside clinic admin and admin citations over a 20-case frozen set (`data/health_cases.jsonl`).
 
 ## Learning outcomes
 

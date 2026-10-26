@@ -18,14 +18,14 @@
     <nav class="modules" aria-label="Course modules">
       {% for number, description in stages.items %}
       <a class="module {% if number == stage %}active{% endif %}" href="/?stage={{ number }}" {% if number == stage %}aria-current="page"{% endif %}>
-        <span class="step">{% if number == agent %}1–6{% else %}0{{ number }}{% endif %}</span><strong>{{ description.0 }}</strong><small>{{ description.1 }}</small>
+        <span class="step">{% if number == agent %}1–7{% else %}0{{ number }}{% endif %}</span><strong>{{ description.0 }}</strong><small>{{ description.1 }}</small>
       </a>
       {% endfor %}
     </nav>
 
     <main class="grid">
       <section class="panel conversation" aria-labelledby="workspace-title">
-        <div class="panel-head"><div><p class="eyebrow">{% if stage == agent %}MODULES 01–06{% else %}MODULE 0{{ stage }}{% endif %}</p><h2 id="workspace-title">{{ stage_title }}</h2></div>
+        <div class="panel-head"><div><p class="eyebrow">{% if stage == agent %}MODULES 01–07{% else %}MODULE 0{{ stage }}{% endif %}</p><h2 id="workspace-title">{{ stage_title }}</h2></div>
           <form method="post" action="{% url 'reset' stage %}">{% csrf_token %}<button class="secondary" type="submit">Reset module</button></form>
         </div>
         {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
@@ -36,7 +36,7 @@
         {% if stage == 5 %}<p class="explain">Each question retrieves approved, current passages for your region. Answers cite them; with no evidence, a fixed reply comes from code and the answer model is never called.</p>{% endif %}
         {% if stage == 6 %}<p class="explain">The model may only propose a read-only order lookup. Code checks the sign-in and that the order is yours, runs the tool and writes the reply from the order record. Nothing can be changed.</p>{% endif %}
         {% if stage == 7 %}<p class="explain">A fictional clinic's support chat. Code screens every message for emergencies, clinical questions and action requests before any model call. Only questions about how the clinic works are answered, from approved clinic documents. Nothing you type here is kept.</p>{% endif %}
-        {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do.</p>{% endif %}
+        {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do; an emergency or health question gets the Module 7 code-written reply before any model call and is not kept.</p>{% endif %}
 
         {% if history %}<div class="history" aria-label="Recent conversation">
           {% for item in history %}<p class="bubble {{ item.role }}"><strong>{{ item.role|title }}</strong><br>{{ item.content }}</p>{% endfor %}
@@ -115,7 +115,7 @@
           <p class="hint">Try as customer A: “Where is order ORD-1001?”, “Where is order ORD-2001?” and “Cancel my order ORD-1001.”</p>{% endif %}
         {% if stage == 7 %}<h2>Healthcare support</h2><p>Levels of care, from least to most cautious: out of scope, clinic admin, action request, clinical, emergency. The code screen runs first and an emergency never reaches the model. The model's category can raise the level, never lower it. Only clinic admin questions are answered, from approved clinic documents.</p>
           <p class="hint">Try: “What should I bring to my first visit?”, “What dose of ibuprofen should I take?”, “Can I take my antibiotic with food?” and “I have chest pain.”</p>{% endif %}
-        {% if stage == agent %}<h2>One agent, every module</h2><p>Retrieved evidence (05) backs validated routing (03) and reported facts (04), cited answers use recent context (02), order numbers are looked up with the read-only tool (06), and every reply shows its model metrics (01).</p>
+        {% if stage == agent %}<h2>One agent, every module</h2><p>Retrieved evidence (05) backs validated routing (03) and reported facts (04), cited answers use recent context (02), order numbers are looked up with the read-only tool (06), every reply shows its model metrics (01), and the safety screen (07) runs before all of them.</p>
           <p class="hint">Sign in as customer A, then try: “Where is my order?”, then “ORD-1001”, then “What is the return policy?”</p>{% endif %}
         {% if stage == 6 or stage == agent %}<h3>Tool audit trail</h3>
           {% if audit %}<table class="corpus"><thead><tr><th>Time</th><th>Customer</th><th>Order</th><th>Decision</th></tr></thead><tbody>

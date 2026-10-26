@@ -19,6 +19,7 @@ MAX_HISTORY = 8
 REGION_REPLY = "The answer depends on your delivery region. Choose your region and ask again."
 UNCONFIRMED = "I could not confirm that from approved information. A support professional can help."
 FAILED = "I cannot process that safely right now. Please contact support."
+AGENT_SCREENED = ("emergency", "clinical")  # clinic booking phrases do not apply to the shop agent
 
 
 @dataclass(frozen=True)
@@ -157,10 +158,16 @@ def agent_turn(*, message: str, session, gateway: Gateway, region: str = "",
     passages as evidence and update reported facts (invalid output commits nothing).
     Module 6 looks up an order in play with the read-only tool. Otherwise Module 5 grounds an
     approved-information route, with Module 2 context and Module 4 facts in the request.
-    Module 1 metrics cover every model call.
+    Module 1 metrics cover every model call. Module 7 screens first: an emergency or clinical
+    message gets the code-written reply, calls no model and is kept nowhere in the session.
     """
     started = time.perf_counter()
     message = clean(message)
+    screened = screen(message)
+    if screened in AGENT_SCREENED:
+        return Turn("ok", HEALTH_REPLIES[screened], "handoff", "not called",
+                    round((time.perf_counter() - started) * 1000, 2), None, None,
+                    safety={"screen": screened, "proposed": "not asked", "category": screened})
     retrieval = (retriever or get_retriever()).retrieve(message, region=region)
     turn = process_turn(stage=4, message=message, session=session, gateway=gateway,
                         policy=evidence_text(retrieval.passages))
