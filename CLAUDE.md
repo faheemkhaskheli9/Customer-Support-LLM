@@ -8,6 +8,7 @@ A course ("Customer Support LLM") that builds a trustworthy customer-support ass
 
 - **`webapp/` is the active code.** It is one Django app that grows with every module. **New course features go here.**
 - **`module-01/` … `module-04/` are historical CLI packages.** They are kept so published article links keep working. Change them only to fix those links or keep them consistent with the articles.
+- **`module-05/` is the standalone `rag_lab` package** linked from the Module 5 article. It copies `webapp/data/corpus/` and `rag_cases.jsonl` and must give the same evaluation numbers; keep the copies in sync when the corpus or cases change.
 - Lesson articles: `docs/module-01.md` and `docs/module-02.md`. Modules 3+ live in `knowledge-base/modules/` (`module-0N.md`, `-outline.md`, `-medium.md`). Older CLI-era versions of the articles are in `docs/legacy/` and `knowledge-base/modules/legacy/`.
 - Keep counts and file names quoted in articles/READMEs (e.g. "24 synthetic cases", "34 cases", "43 chunks", Module 5 evaluation numbers) in sync with the code. Articles link to code via `https://github.com/faheemkhaskheli9/Customer-Support-LLM/tree/main/<folder>/`.
 
@@ -34,9 +35,10 @@ The backend is chosen by `SUPPORT_MODEL_BACKEND` in `webapp/.env` (copy it from 
 python -m pip install -e ".[dev]"          # module-04: add ",live" for OpenAI extras
 python -m pytest -q
 python -m pytest tests/test_state.py::test_name -q
+python -m rag_lab.run_eval                 # module-05: frozen evaluation; --live/--hybrid cost money
 ```
 
-Each module is its own package (`support_basics`, `customer_support`, `prompt_lab`, `state_lab`) with its own `.venv`, `.env`, notebook and tests. A module never imports from another module or from `webapp/`. There is no linter or formatter configured.
+Each module is its own package (`support_basics`, `customer_support`, `prompt_lab`, `state_lab`, `rag_lab`) with its own `.venv`, `.env`, notebook and tests. A module never imports from another module or from `webapp/`. There is no linter or formatter configured.
 
 ## Webapp architecture
 

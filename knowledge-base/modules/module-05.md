@@ -778,7 +778,7 @@ How would you fix it? Some options: add "delivery charge" wording to both delive
 
 ### A passing case that still needs a human
 
-"Do gift cards expire?" (RAG-019) passes every automated check: retrieval found GFT-01, the route is an answer, the citation is valid. The offline answer is: "Gift cards cannot be exchanged for cash or replaced if lost."
+"Do gift cards expire?" (RAG-019) passes every automated check: retrieval found GFT-01, the route is an answer, the citation is valid. The offline answer is: "Gift cards cannot be exchanged for cash or replaced if lost. Keep the gift card code private."
 
 That doesn't answer the question. The sentence that does, "Gift cards can be used for any order on the store and are valid for 12 months from purchase", is in the *other* GFT-01 chunk. Both chunks share "gift" and "card" with the question equally, and the extractive generator keeps the higher-ranked passage on a tie. The "Lost gift cards" chunk ranked first because its heading repeats the words.
 
