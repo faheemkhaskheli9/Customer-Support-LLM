@@ -1,6 +1,7 @@
 """End-to-end checks for the evolving web app, without paid model calls."""
 
 import json
+import re
 from io import StringIO
 from dataclasses import replace
 from datetime import timedelta
@@ -10,7 +11,7 @@ from unittest.mock import patch
 
 from django.core.management import CommandError, call_command
 
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from .corpus import chunk_document, ingest, load_corpus, parse_document, split_text
@@ -744,3 +745,26 @@ class Module9DeploymentTests(TestCase):
         self.assertContains(page, "RUNBOOK")
         self.assertNotContains(page, "Send message")
         self.assertRedirects(self.client.post("/chat/9/", {"message": "Hello"}), "/?stage=9")
+
+
+REPO = Path(__file__).resolve().parents[2]
+OWN_REPO = re.compile(r"https://github\.com/faheemkhaskheli9/Customer-Support-LLM/(?:tree|blob)/main/([^)\s#]*)")
+
+
+class RepoLinkTests(SimpleTestCase):
+    def test_every_markdown_link_opens_a_file_in_the_repo(self):
+        broken = []
+        for page in sorted(REPO.rglob("*.md")):
+            if any(part.startswith(".") for part in page.relative_to(REPO).parts):
+                continue  # .venv, .pytest_cache and other local folders
+            for target in re.findall(r"\]\(([^)\s]+)\)", page.read_text(encoding="utf-8")):
+                if target.startswith(("#", "mailto:")):
+                    continue
+                if target.startswith("http"):
+                    own = OWN_REPO.match(target)
+                    path = REPO / own.group(1) if own else None
+                else:
+                    path = page.parent / target.split("#")[0]
+                if path is not None and not path.exists():
+                    broken.append(f"{page.relative_to(REPO)} -> {target}")
+        self.assertEqual(broken, [])
