@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass, replace
 
 from .gateway import Gateway
+from .health import REPLIES as HEALTH_REPLIES, ROUTES as HEALTH_ROUTES, get_clinic_retriever, more_cautious, parse_triage, screen
 from .retrieval import Retrieval, Retriever, citation, evidence_text, get_retriever
 from .routing import customer_response, parse_grounded, parse_route
 from .state import apply_proposal, fresh_state, is_expired
@@ -32,6 +33,7 @@ class Turn:
     sources: tuple = ()            # Module 5: citations built from retrieval metadata
     retrieval: dict | None = None  # Module 5: why evidence was or was not used
     tool: dict | None = None       # Module 6: the checked tool call and its record
+    safety: dict | None = None     # Module 7: code screen, model proposal and final category
 
     def as_dict(self) -> dict:
         return vars(self).copy()
@@ -209,6 +211,42 @@ def lookup(request: dict, *, session, orders: Orders | None = None, now=None) ->
     session["tool_audit"] = (list(session.get("tool_audit", [])) + [audit_entry(result, customer, now)])[-MAX_AUDIT:]
     route = "use_tool" if result.decision == "allowed" else "handoff" if result.decision == "rate_limited" else "ask_clarifying_question"
     return {"response": describe(result), "route": route, "tool": result.as_dict()}
+
+
+def health_turn(*, message: str, gateway: Gateway, retriever: Retriever | None = None,
+                today=None) -> Turn:
+    """The Module 7 page: code screens first; only clinic admin questions reach retrieval.
+
+    An emergency never calls the model. The model's category can raise the level of care,
+    never lower it. Nothing from the message is kept in the session.
+    """
+    started = time.perf_counter()
+    message = clean(message)
+    screened = screen(message)
+    safety = {"screen": screened, "proposed": "not asked", "category": screened}
+
+    def done(turn: Turn) -> Turn:
+        return replace(turn, latency_ms=round((time.perf_counter() - started) * 1000, 2))
+
+    if screened == "emergency":
+        return done(Turn("ok", HEALTH_REPLIES["emergency"], "handoff", "not called", 0.0, None, None,
+                         safety=safety))
+    try:
+        generated = gateway.generate(stage=7, messages=[{"role": "user", "content": message}])
+        proposed = parse_triage(generated.text)
+    except (ValueError, RuntimeError):
+        return done(Turn("error", FAILED, "handoff", "unavailable", 0.0, None, None, safety=safety))
+    category = more_cautious(screened, proposed)
+    safety = {**safety, "proposed": proposed, "category": category}
+    turn = Turn("ok", HEALTH_REPLIES.get(category, ""), HEALTH_ROUTES[category], generated.model, 0.0,
+                generated.input_tokens, generated.output_tokens, safety=safety)
+    if category != "clinic_admin":
+        return done(turn)
+    retrieval = (retriever or get_clinic_retriever()).retrieve(message, today=today)
+    if not retrieval.passages:
+        return done(replace(turn, response=HEALTH_REPLIES["no_evidence"], route="unsupported",
+                            retrieval={**retrieval.summary(), "grounding": "no_evidence"}))
+    return done(ground(turn, gateway=gateway, message=message, retrieval=retrieval))
 
 
 def order_lookup(turn: Turn, *, gateway: Gateway, message: str, session, orders: Orders | None = None,

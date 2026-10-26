@@ -8,9 +8,9 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from .gateway import get_gateway
-from .evaluation import run_offline_evaluation, run_rag_evaluation, run_tool_evaluation
+from .evaluation import run_health_evaluation, run_offline_evaluation, run_rag_evaluation, run_tool_evaluation
 from .retrieval import corpus_table, get_retriever
-from .service import active_state, agent_turn, process_turn, rag_turn, tool_turn
+from .service import active_state, agent_turn, health_turn, process_turn, rag_turn, tool_turn
 from .state import correct_fact, is_expired
 from .tools import get_orders
 
@@ -24,12 +24,14 @@ STAGES = {  # insertion order is nav order: the main agent first, then the lesso
     4: ("Safe memory", "Fact corrections, review, retention, expiry, and deletion"),
     5: ("Approved retrieval", "Versioned documents, filters first, citations, and a no-evidence fallback"),
     6: ("Read-only tools", "Order lookups behind sign-in, permission checks, and an audit trail"),
+    7: ("Healthcare support", "Emergency and clinical screening in code, clinic-only answers"),
 }
 # Region is application-owned access control, validated here, never extracted by the model.
 REGIONS = {"": "Not set", "PK": "Pakistan", "AE": "United Arab Emirates"}
 RETRIEVAL_STAGES = (5, AGENT)
 TOOL_STAGE = 6
 TOOL_STAGES = (TOOL_STAGE, AGENT)
+HEALTH_STAGE = 7
 HISTORY_KEYS = {2: "m2_history", 3: "m3_history", AGENT: "agent_history"}
 
 
@@ -66,6 +68,7 @@ def home(request):
         "customer": request.session.get("customer", ""),
         "audit": list(reversed(request.session.get("tool_audit", []))) if stage in TOOL_STAGES else [],
         "tool_evaluation": request.session.pop("tool_evaluation", None),
+        "health_evaluation": request.session.pop("health_evaluation", None),
     })
 
 
@@ -93,6 +96,9 @@ def chat(request, stage: int):
         elif stage == TOOL_STAGE:
             turn = tool_turn(message=request.POST.get("message", ""), session=request.session,
                              gateway=get_gateway())
+        elif stage == HEALTH_STAGE:
+            # Minimum necessary: no history, no reported facts; only the result is shown once.
+            turn = health_turn(message=request.POST.get("message", ""), gateway=get_gateway())
         elif stage == 5:
             turn = rag_turn(message=request.POST.get("message", ""), gateway=get_gateway(), region=region)
         else:
@@ -121,6 +127,12 @@ def rag_evaluate(request):
 def tool_evaluate(request):
     request.session["tool_evaluation"] = run_tool_evaluation()
     return redirect("/?stage=6")
+
+
+@require_POST
+def health_evaluate(request):
+    request.session["health_evaluation"] = run_health_evaluation()
+    return redirect(f"/?stage={HEALTH_STAGE}")
 
 
 @require_POST
