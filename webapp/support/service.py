@@ -10,6 +10,8 @@ from .gateway import Gateway
 from .retrieval import Retrieval, Retriever, citation, evidence_text, get_retriever
 from .routing import customer_response, parse_grounded, parse_route
 from .state import apply_proposal, fresh_state, is_expired
+from .tools import (CLARIFY, HANDOFF, MAX_AUDIT, UNSUPPORTED, Orders, audit_entry, describe,
+                    parse_tool_request, run_tool)
 
 MAX_MESSAGE = 4000
 MAX_HISTORY = 8
@@ -29,6 +31,7 @@ class Turn:
     output_tokens: int | None
     sources: tuple = ()            # Module 5: citations built from retrieval metadata
     retrieval: dict | None = None  # Module 5: why evidence was or was not used
+    tool: dict | None = None       # Module 6: the checked tool call and its record
 
     def as_dict(self) -> dict:
         return vars(self).copy()
@@ -166,3 +169,33 @@ def agent_turn(*, message: str, session, gateway: Gateway, region: str = "",
     session["agent_history"] = (history + [{"role": "user", "content": message},
                                            {"role": "assistant", "content": turn.response}])[-MAX_HISTORY:]
     return replace(turn, latency_ms=round((time.perf_counter() - started) * 1000, 2))
+
+
+def tool_turn(*, message: str, session, gateway: Gateway, orders: Orders | None = None,
+              now=None) -> Turn:
+    """The Module 6 page: the model proposes a read-only call; code authorizes, runs and replies.
+
+    Invalid model output runs no tool and records nothing. Every executed decision is audited.
+    """
+    started = time.perf_counter()
+    message = clean(message)
+    try:
+        generated = gateway.generate(stage=6, messages=[{"role": "user", "content": message}])
+        request = parse_tool_request(generated.text)
+    except (ValueError, RuntimeError):
+        return Turn("error", FAILED, "handoff", "unavailable",
+                    round((time.perf_counter() - started) * 1000, 2), None, None)
+    turn = Turn("ok", "", request["route"], generated.model, 0.0,
+                generated.input_tokens, generated.output_tokens)
+    if request["route"] != "use_tool":
+        reply = {"ask_clarifying_question": CLARIFY, "handoff": HANDOFF}.get(request["route"], UNSUPPORTED)
+        return replace(turn, response=reply, latency_ms=round((time.perf_counter() - started) * 1000, 2))
+    customer = session.get("customer", "")
+    result = run_tool(request, customer=customer, lookups=session.get("m6_lookups", 0),
+                      orders=orders, now=now)
+    if result.decision in ("allowed", "denied", "not_found"):
+        session["m6_lookups"] = session.get("m6_lookups", 0) + 1
+    session["tool_audit"] = (list(session.get("tool_audit", [])) + [audit_entry(result, customer, now)])[-MAX_AUDIT:]
+    route = "use_tool" if result.decision == "allowed" else "handoff" if result.decision == "rate_limited" else "ask_clarifying_question"
+    return replace(turn, response=describe(result), route=route, tool=result.as_dict(),
+                   latency_ms=round((time.perf_counter() - started) * 1000, 2))
