@@ -180,7 +180,7 @@ class CourseWebTests(TestCase):
         self.assertEqual(self.client.session["m4_state"]["current_facts"]["reported_symptom"]["source"], "reported_by_customer")
 
     def test_agent_is_the_default_page(self):
-        self.assertContains(self.client.get("/"), "MODULES 01–05")
+        self.assertContains(self.client.get("/"), "MODULES 01–06")
 
     def test_agent_routes_remembers_facts_and_answers_with_context(self):
         self.client.post("/chat/0/", {"message": "Where is my order?"})
@@ -487,6 +487,54 @@ class Module6ToolTests(TestCase):
         result = run_tool_evaluation()
         self.assertEqual((result["total"], result["routes"], result["decisions"]), (16, 16, 16))
         self.assertEqual((result["leaks"], result["tool_on_handoff"], result["failures"]), (0, 0, []))
+
+    def test_agent_looks_up_a_reported_order_for_the_signed_in_customer(self):
+        self.client.post("/chat/0/", {"message": "Where is my order?", "customer": "CUST-A"})
+        self.assertEqual(self.client.session["last_result"]["route"], "ask_clarifying_question")
+        recording = Recording()
+        with patch("support.views.get_gateway", return_value=recording):
+            self.client.post("/chat/0/", {"message": "ORD-1001"})
+        result = self.client.session["last_result"]
+        self.assertEqual(recording.stages, [4, 6])  # no answer-model call for an order lookup
+        self.assertEqual((result["route"], result["tool"]["decision"]), ("use_tool", "allowed"))
+        self.assertEqual(result["retrieval"]["grounding"], "order_tool")
+        self.assertIn("in transit with Northwind Couriers", result["response"])
+        self.assertEqual(self.client.session["m4_state"]["current_facts"]["order_reference"]["source"],
+                         "reported_by_customer")  # the record does not become a reported fact
+        self.client.post("/chat/0/", {"message": "What is the status of my order?"})
+        self.assertEqual(self.client.session["last_result"]["tool"]["order_reference"], "ORD-1001")
+        page = self.client.get("/?stage=0")
+        self.assertContains(page, "TOOL · order_status · allowed")
+        self.assertContains(page, "Tool audit trail")
+
+    def test_agent_never_looks_up_on_handoff_or_for_another_customer(self):
+        self.client.post("/chat/0/", {"message": "Cancel my order ORD-1001.", "customer": "CUST-A"})
+        result = self.client.session["last_result"]
+        self.assertEqual(result["route"], "handoff")
+        self.assertIsNone(result["tool"])
+        self.assertNotIn("tool_audit", self.client.session)
+        self.client.post("/chat/0/", {"message": "Where is order ORD-2001?"})
+        result = self.client.session["last_result"]
+        self.assertEqual(result["tool"]["decision"], "denied")
+        self.assertNotIn("Bluebird", result["response"])
+        recording = Recording()
+        with patch("support.views.get_gateway", return_value=recording):
+            self.client.post("/chat/0/", {"message": "What is the return policy?"})
+        self.assertEqual(recording.stages, [4, 5])  # no order in play, no tool call
+
+    def test_agent_keeps_the_safe_reply_when_the_tool_proposal_is_invalid(self):
+        class BadTool:
+            def generate(self, **kwargs):
+                if kwargs["stage"] == 6:
+                    return Generation("{bad", "fake")
+                return OfflineGateway().generate(**kwargs)
+        self.client.post("/chat/0/", {"message": "Where is order ORD-1001?", "customer": "CUST-A"})
+        with patch("support.views.get_gateway", return_value=BadTool()):
+            self.client.post("/chat/0/", {"message": "Where is order ORD-1003?"})
+        result = self.client.session["last_result"]
+        self.assertEqual((result["route"], result["tool"]), ("handoff", None))
+        self.assertIn("No action has been completed", result["response"])
+        self.assertEqual(len(self.client.session["tool_audit"]), 1)
 
     def test_module_6_page_sign_in_tool_panel_and_audit(self):
         self.client.post("/chat/6/", {"message": "Where is order ORD-1001?", "customer": "CUST-A"})
