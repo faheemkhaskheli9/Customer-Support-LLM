@@ -9,13 +9,14 @@ This Django app is the active code for Modules 1–6. Select a module in the top
 5. **Module 5** (`/?stage=5`): retrieval from the fictional, versioned corpus in `data/corpus/` (19 document versions, 43 chunks). Eligibility filters (approved, in effect, current version, delivery region) run before BM25 ranking; a relevance threshold decides what counts as evidence. With no evidence, a fixed reply comes from code and the answer model is never called. Citations are built from retrieval metadata. The page shows Sources, a Retrieval panel, the corpus with each version's status, and a 34-case offline retrieval evaluation.
 6. **Module 6** (`/?stage=6`): a read-only `order_status` tool over the fictional records in `data/orders.json`. The model only proposes a call as strict JSON (`parse_tool_request`); code checks a demo sign-in, that the order belongs to the signed-in customer, and a per-session lookup limit, then writes the reply from the record. Another customer's order gets the same reply as a missing one. Action, clinical and instruction-override requests are handed off without a tool call. Every decision goes to an audit trail holding IDs only. The page has a 16-case offline tool evaluation.
 
-The home page (`/?stage=0`) is the **Support agent**, which has every module's feature in one conversation (`agent_turn` in `support/service.py`). It works in three steps:
+The home page (`/?stage=0`) is the **Support agent**, which has every module's feature in one conversation (`agent_turn` in `support/service.py`). It works in four steps:
 
 1. Module 5 retrieves approved passages for the message and the selected delivery region.
 2. The message is routed through the Module 4 contract with only those passages as evidence. That step validates the JSON, updates reported facts, and returns fixed replies from code for handoff, unsupported and clarification.
-3. When the route is an approved-information answer, a second model call returns `{"answer", "used_passages"}` from the passages, the recent agent conversation and the reported facts. The answer is validated and cited from retrieval metadata; an invalid answer becomes a fixed handoff reply.
+3. When an order reference is in play (reported this turn, or a reported one and the message mentions an order) and the route is not a policy answer, the Module 6 proposer is asked for a tool call. A handoff proposal keeps the Module 4 reply; a clarifying proposal is filled from the reported `order_reference`. The lookup runs with the same sign-in, ownership and limit checks as the Module 6 page, and the reply comes from the order record. Invalid proposer output keeps the Module 4 reply.
+4. Otherwise, when the route is an approved-information answer, a second model call returns `{"answer", "used_passages"}` from the passages, the recent agent conversation and the reported facts. The answer is validated and cited from retrieval metadata; an invalid answer becomes a fixed handoff reply.
 
-Every reply shows its model metrics. Fact corrections, retention and deletion work on the same page, and deletion also clears the region.
+Every reply shows its model metrics. Fact corrections, retention, the demo sign-in and the tool audit trail are on the same page, and deletion also clears the region, sign-in and audit trail. The order record is shown in the tool panel and never becomes a reported fact.
 
 The older `module-01/` through `module-04/` directories remain as historical CLI companions so published links keep working. `module-05/` is the standalone `rag_lab` package for the Module 5 article. New course features belong here.
 
@@ -48,7 +49,7 @@ python manage.py check
 python manage.py test support
 ~~~
 
-The 39 tests cover all six stages, CSRF protection, session isolation, correction, expiry, deletion, invalid model output, both offline evaluations, and Module 5's loader, chunk IDs, filters, region fallback, grounded-answer parser, citations, no-call fallback, poisoned document and hybrid fusion, and Module 6's order loader, tool-request parser, ownership check, sign-in, lookup limit, audit trail and tool evaluation. The old CLI tests are still available in their historical folders.
+The 42 tests cover all six stages, CSRF protection, session isolation, correction, expiry, deletion, invalid model output, both offline evaluations, and Module 5's loader, chunk IDs, filters, region fallback, grounded-answer parser, citations, no-call fallback, poisoned document and hybrid fusion, and Module 6's order loader, tool-request parser, ownership check, sign-in, lookup limit, audit trail, tool evaluation and the agent's order lookups. The old CLI tests are still available in their historical folders.
 
 ## Code map
 

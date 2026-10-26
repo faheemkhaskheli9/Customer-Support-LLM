@@ -17,7 +17,7 @@ from .tools import get_orders
 POLICY = (Path(__file__).resolve().parents[1] / "data" / "approved_policy.txt").read_text(encoding="utf-8")
 AGENT = 0
 STAGES = {  # insertion order is nav order: the main agent first, then the lessons
-    AGENT: ("Support agent", "All five modules in one conversation"),
+    AGENT: ("Support agent", "All six modules in one conversation"),
     1: ("First model call", "One message, support rules, and usage measurements"),
     2: ("Multi-turn chat", "Bounded conversation context and controlled failures"),
     3: ("Prompt routing", "Versioned instructions, validated JSON, and handoff routes"),
@@ -29,6 +29,7 @@ STAGES = {  # insertion order is nav order: the main agent first, then the lesso
 REGIONS = {"": "Not set", "PK": "Pakistan", "AE": "United Arab Emirates"}
 RETRIEVAL_STAGES = (5, AGENT)
 TOOL_STAGE = 6
+TOOL_STAGES = (TOOL_STAGE, AGENT)
 HISTORY_KEYS = {2: "m2_history", 3: "m3_history", AGENT: "agent_history"}
 
 
@@ -61,9 +62,9 @@ def home(request):
         "rag_evaluation": request.session.pop("rag_evaluation", None),
         "corpus": corpus,
         # Module 6: a demo sign-in stands in for real authentication; the tool checks it in code.
-        "customers": {"": "Not signed in", **get_orders().customers} if stage == TOOL_STAGE else {},
+        "customers": {"": "Not signed in", **get_orders().customers} if stage in TOOL_STAGES else {},
         "customer": request.session.get("customer", ""),
-        "audit": list(reversed(request.session.get("tool_audit", []))) if stage == TOOL_STAGE else [],
+        "audit": list(reversed(request.session.get("tool_audit", []))) if stage in TOOL_STAGES else [],
         "tool_evaluation": request.session.pop("tool_evaluation", None),
     })
 
@@ -82,7 +83,7 @@ def chat(request, stage: int):
         return redirect("home")
     if stage in RETRIEVAL_STAGES and "region" in request.POST and request.POST["region"] in REGIONS:
         request.session["region"] = request.POST.get("region", "")
-    if stage == TOOL_STAGE and request.POST.get("customer", "") in {"", *get_orders().customers}:
+    if stage in TOOL_STAGES and "customer" in request.POST and request.POST["customer"] in {"", *get_orders().customers}:
         request.session["customer"] = request.POST.get("customer", "")
     region = request.session.get("region", "")
     try:
@@ -176,7 +177,7 @@ def reset(request, stage: int):
         request.session.pop("m4_state", None)
         if stage == AGENT:
             request.session.pop("agent_history", None)
-    elif stage == TOOL_STAGE:
+    if stage in TOOL_STAGES:
         request.session.pop("tool_audit", None)
     request.session.pop("last_result", None)
     return redirect(f"/?stage={stage if stage in STAGES else AGENT}")

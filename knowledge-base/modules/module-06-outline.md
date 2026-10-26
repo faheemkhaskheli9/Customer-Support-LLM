@@ -29,7 +29,8 @@ This module adds one read-only tool, `order_status`. The model may only *propose
 5. Give another customer's order the same reply as a missing one, so a lookup never confirms that an order exists.
 6. Write the customer reply from the order record (`describe`), never from model text, and strip the owner ID from what the page shows.
 7. Record every executed decision in an audit trail that holds IDs and decisions only, never message text or order details.
-8. Evaluate routes, decisions, cross-customer leaks and tool calls on handoff over a 16-case frozen set (`data/tool_cases.jsonl`).
+8. Use the same tool in the home-page support agent: once an order number is reported, the agent looks it up for the signed-in customer instead of handing off, and still hands off action requests.
+9. Evaluate routes, decisions, cross-customer leaks and tool calls on handoff over a 16-case frozen set (`data/tool_cases.jsonl`).
 
 ## Learning outcomes
 
@@ -53,7 +54,6 @@ By the end, learners can:
 - The demo sign-in is a select box. It stands in for real authentication and proves nothing about identity.
 - The audit trail lives in the browser session, so deleting session data removes it. A real audit log is kept server-side and cannot be deleted by the customer.
 - The records are fictional and held in memory. There is no real order API.
-- The support agent on the home page does not use the tool yet; it still hands order questions off.
 - 16 synthetic cases are a regression harness, not a security validation.
 
 ## Next module

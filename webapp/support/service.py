@@ -148,13 +148,14 @@ def rag_turn(*, message: str, gateway: Gateway, region: str = "",
 
 
 def agent_turn(*, message: str, session, gateway: Gateway, region: str = "",
-               retriever: Retriever | None = None) -> Turn:
+               retriever: Retriever | None = None, orders: Orders | None = None) -> Turn:
     """The main support agent: every module's feature in one conversation.
 
     Module 5 retrieves approved passages. Modules 3-4 route the message with only those
     passages as evidence and update reported facts (invalid output commits nothing).
-    Module 5 grounds an approved-information route, with Module 2 context and Module 4
-    facts in the request. Module 1 metrics cover both model calls.
+    Module 6 looks up an order in play with the read-only tool. Otherwise Module 5 grounds an
+    approved-information route, with Module 2 context and Module 4 facts in the request.
+    Module 1 metrics cover every model call.
     """
     started = time.perf_counter()
     message = clean(message)
@@ -165,7 +166,11 @@ def agent_turn(*, message: str, session, gateway: Gateway, region: str = "",
         return turn  # failed turns are not committed to history
     history = list(session.get("agent_history", []))[-MAX_HISTORY:]
     facts = {k: v["value"] for k, v in session["m4_state"]["current_facts"].items()}
-    turn = ground(turn, gateway=gateway, message=message, retrieval=retrieval, history=history, facts=facts)
+    turn = order_lookup(turn, gateway=gateway, message=message, session=session, orders=orders)
+    if turn.tool:
+        turn = replace(turn, retrieval={**retrieval.summary(), "grounding": "order_tool"})
+    else:
+        turn = ground(turn, gateway=gateway, message=message, retrieval=retrieval, history=history, facts=facts)
     session["agent_history"] = (history + [{"role": "user", "content": message},
                                            {"role": "assistant", "content": turn.response}])[-MAX_HISTORY:]
     return replace(turn, latency_ms=round((time.perf_counter() - started) * 1000, 2))
@@ -190,6 +195,12 @@ def tool_turn(*, message: str, session, gateway: Gateway, orders: Orders | None 
     if request["route"] != "use_tool":
         reply = {"ask_clarifying_question": CLARIFY, "handoff": HANDOFF}.get(request["route"], UNSUPPORTED)
         return replace(turn, response=reply, latency_ms=round((time.perf_counter() - started) * 1000, 2))
+    return replace(turn, **lookup(request, session=session, orders=orders, now=now),
+                   latency_ms=round((time.perf_counter() - started) * 1000, 2))
+
+
+def lookup(request: dict, *, session, orders: Orders | None = None, now=None) -> dict:
+    """Run a validated tool request for the signed-in customer, count it and audit it."""
     customer = session.get("customer", "")
     result = run_tool(request, customer=customer, lookups=session.get("m6_lookups", 0),
                       orders=orders, now=now)
@@ -197,5 +208,32 @@ def tool_turn(*, message: str, session, gateway: Gateway, orders: Orders | None 
         session["m6_lookups"] = session.get("m6_lookups", 0) + 1
     session["tool_audit"] = (list(session.get("tool_audit", [])) + [audit_entry(result, customer, now)])[-MAX_AUDIT:]
     route = "use_tool" if result.decision == "allowed" else "handoff" if result.decision == "rate_limited" else "ask_clarifying_question"
-    return replace(turn, response=describe(result), route=route, tool=result.as_dict(),
-                   latency_ms=round((time.perf_counter() - started) * 1000, 2))
+    return {"response": describe(result), "route": route, "tool": result.as_dict()}
+
+
+def order_lookup(turn: Turn, *, gateway: Gateway, message: str, session, orders: Orders | None = None,
+                 now=None) -> Turn:
+    """Module 6 in the agent: only when an order reference is in play, and never on a handoff proposal.
+
+    The tool proposer sees the message; a clarifying proposal is filled from the reported
+    order_reference fact. The tool still checks sign-in and ownership, so a reported number
+    can never show someone else's order. Invalid proposer output keeps the Module 4 reply.
+    """
+    state = session["m4_state"]
+    fact = state["current_facts"].get("order_reference")
+    if (turn.route == "answer_from_approved_info" or not fact
+            or (fact["source_event_id"] != state["event_number"] and "order" not in message.lower())):
+        return turn
+    try:
+        generated = gateway.generate(stage=6, messages=[{"role": "user", "content": message}])
+        request = parse_tool_request(generated.text)
+        if request["route"] == "ask_clarifying_question":
+            request = parse_tool_request(json.dumps({"route": "use_tool", "tool": "order_status",
+                                                     "arguments": {"order_reference": fact["value"]}}))
+    except (ValueError, RuntimeError):
+        return turn
+    turn = replace(turn, input_tokens=_add(turn.input_tokens, generated.input_tokens),
+                   output_tokens=_add(turn.output_tokens, generated.output_tokens))
+    if request["route"] != "use_tool":
+        return turn
+    return replace(turn, **lookup(request, session=session, orders=orders, now=now))
