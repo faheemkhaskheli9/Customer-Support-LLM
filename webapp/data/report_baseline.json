@@ -1,0 +1,15 @@
+{
+  "frozen": "2026-10-26",
+  "backend": "offline",
+  "quality": {
+    "routing.matched": 15,
+    "retrieval.recall_hits": 23,
+    "retrieval.fallback_hits": 5,
+    "retrieval.routes": 32,
+    "retrieval.cited_valid": 23,
+    "tools.routes": 16,
+    "tools.decisions": 16,
+    "safety.categories": 20,
+    "safety.admin_cited": 5
+  }
+}

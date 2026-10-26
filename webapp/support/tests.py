@@ -1,11 +1,14 @@
 """End-to-end checks for the evolving web app, without paid model calls."""
 
 import json
+from io import StringIO
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+
+from django.core.management import CommandError, call_command
 
 from django.test import Client, TestCase
 from django.utils import timezone
@@ -17,6 +20,7 @@ from .retrieval import Retriever, get_retriever, tokens
 from .routing import parse_grounded
 from .service import agent_turn, health_turn, process_turn, rag_turn, tool_turn
 from .evaluation import run_health_evaluation, run_tool_evaluation
+from .report import load_baseline, run_report, to_markdown
 from .health import REPLIES as HEALTH_REPLIES, get_clinic_retriever, parse_triage, screen
 from .tools import MAX_LOOKUPS, get_orders, load_orders, parse_tool_request
 
@@ -77,8 +81,8 @@ class ConceptEmbedder:
 
 
 class CourseWebTests(TestCase):
-    def test_all_seven_modules_render(self):
-        for stage in range(1, 8):
+    def test_all_eight_modules_render(self):
+        for stage in range(1, 9):
             response = self.client.get(f"/?stage={stage}")
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, f"MODULE 0{stage}")
@@ -634,3 +638,44 @@ class Module7HealthTests(TestCase):
         self.assertNotIn("fever", json.dumps(dict(self.client.session.items())))
         self.client.post("/chat/0/", {"message": "Where is my order?"})
         self.assertNotContains(self.client.get("/"), "SAFETY ·")
+
+
+class Module8ReportTests(TestCase):
+    def test_offline_report_passes_every_gate(self):
+        report = run_report()
+        self.assertEqual(report["verdict"], "pass")
+        self.assertTrue(all(g["ok"] and not g["cases"] for g in report["gates"]))
+        self.assertEqual([g["kind"] for g in report["gates"]].count("safety"), 8)
+        self.assertEqual(report["cases"], {"routing": 24, "retrieval": 34, "tools": 16, "safety": 20})
+
+    def test_a_model_that_lowers_the_level_of_care_blocks_the_release(self):
+        report = run_report(Lowering())
+        gates = {g["key"]: g for g in report["gates"]}
+        self.assertEqual(report["verdict"], "blocked")
+        self.assertEqual(report["blocked"], ["Module 7 safety: Emergency recall", "Module 7 safety: Categories"])
+        self.assertEqual((gates["safety.emergency_hits"]["value"], gates["safety.emergency_hits"]["cases"]),
+                         (4, ["HLT-004"]))
+        self.assertEqual(gates["safety.categories"]["cases"], ["HLT-004", "HLT-009", "HLT-019", "HLT-020"])
+        self.assertTrue(gates["safety.model_calls_on_emergency"]["ok"])  # the screen still held
+        self.assertIn("BLOCKED", to_markdown(report))
+
+    def test_baseline_must_name_every_quality_metric(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "baseline.json"
+            path.write_text(json.dumps({"frozen": "2026-10-26", "quality": {"routing.matched": 15}}))
+            with self.assertRaises(ValueError):
+                load_baseline(path)
+
+    def test_report_page_download_and_command(self):
+        self.assertNotContains(self.client.get("/?stage=8"), "Send message")
+        self.client.post("/report/")
+        self.assertContains(self.client.get("/?stage=8"), "RELEASE VERDICT · PASS")
+        download = self.client.get("/report.md")
+        self.assertEqual(download["Content-Disposition"], 'attachment; filename="evaluation-report.md"')
+        self.assertContains(download, "# Evaluation and safety report: PASS")
+        with TemporaryDirectory() as tmp:
+            call_command("evaluation_report", output=str(Path(tmp) / "report.md"), stdout=StringIO())
+            self.assertIn("PASS", (Path(tmp) / "report.md").read_text(encoding="utf-8"))
+        with patch("support.management.commands.evaluation_report.run_report",
+                   return_value=run_report(Lowering())), self.assertRaises(CommandError):
+            call_command("evaluation_report", stdout=StringIO())

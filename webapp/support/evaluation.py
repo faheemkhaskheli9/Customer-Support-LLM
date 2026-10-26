@@ -20,7 +20,8 @@ def load_cases(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def run_offline_evaluation() -> dict:
+def run_offline_evaluation(limit: int | None = 10) -> dict:
+    """The page shows ten failures; the Module 8 report passes limit=None to see them all."""
     cases = load_cases(CASES_PATH)
     gateway = OfflineGateway()
     failures = []
@@ -40,7 +41,7 @@ def run_offline_evaluation() -> dict:
             failures.append({"id": case["case_id"], "expected": case["expected_route"],
                              "actual": "invalid_output"})
     return {"total": len(cases), "matched": matched, "schema_valid": valid,
-            "failures": failures[:10], "backend": "offline-demo"}
+            "failures": failures[:limit], "backend": "offline-demo"}
 
 
 class _Recording:
@@ -75,7 +76,10 @@ def run_rag_evaluation(retriever: Retriever | None = None, gateway=None) -> dict
         problems = []
         retrieval = retriever.retrieve(case["message"], region=case["region"], today=today)
         docs = [c.doc_id for c in retrieval.passages]
-        m["forbidden"] += sum(c.chunk_id not in allowed[case["region"]] for c in retrieval.passages)
+        forbidden = sum(c.chunk_id not in allowed[case["region"]] for c in retrieval.passages)
+        m["forbidden"] += forbidden
+        if forbidden:
+            problems.append(f"{forbidden} forbidden passage(s) retrieved")
         expected = case.get("expected_doc", False)
         if isinstance(expected, str):
             m["recall_total"] += 1
