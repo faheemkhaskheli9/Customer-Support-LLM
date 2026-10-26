@@ -35,6 +35,7 @@
         {% if stage == 4 %}<p class="explain">Review and correct reported facts. A browser session is isolated, expires after 30 minutes, and stores no full Module 4 transcript.</p>{% endif %}
         {% if stage == 5 %}<p class="explain">Each question retrieves approved, current passages for your region. Answers cite them; with no evidence, a fixed reply comes from code and the answer model is never called.</p>{% endif %}
         {% if stage == 6 %}<p class="explain">The model may only propose a read-only order lookup. Code checks the sign-in and that the order is yours, runs the tool and writes the reply from the order record. Nothing can be changed.</p>{% endif %}
+        {% if stage == 7 %}<p class="explain">A fictional clinic's support chat. Code screens every message for emergencies, clinical questions and action requests before any model call. Only questions about how the clinic works are answered, from approved clinic documents. Nothing you type here is kept.</p>{% endif %}
         {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do.</p>{% endif %}
 
         {% if history %}<div class="history" aria-label="Recent conversation">
@@ -54,6 +55,9 @@
             </tbody></table>{% else %}<p class="muted">No eligible passage matched.</p>{% endif %}
             <small>Filtered out before ranking: {% for reason, count in result.retrieval.excluded.items %}{{ reason }} {{ count }}{% if not forloop.last %} · {% endif %}{% empty %}none{% endfor %}</small>
           </details>{% endif %}
+          {% if result.safety %}<div class="sources" aria-label="Safety screen"><span class="label">SAFETY · {{ result.safety.category }}</span>
+            <small>Code screen: {{ result.safety.screen }} · model proposal: {{ result.safety.proposed }} · final: {{ result.safety.category }} (the more cautious of the two)</small>
+          </div>{% endif %}
           {% if result.tool %}<div class="sources" aria-label="Tool call"><span class="label">TOOL · {{ result.tool.tool }} · {{ result.tool.decision }}</span>
             {% if result.tool.record %}<div class="source"><strong>{{ result.tool.record.order_reference }} · {{ result.tool.record.status }}</strong>
               <small>{{ result.tool.source }} · checked {{ result.tool.checked_at }} · record updated {{ result.tool.record.updated_at }}</small></div>
@@ -79,9 +83,16 @@
             <dt>Cross-customer leaks</dt><dd>{{ tool_evaluation.leaks }}</dd><dt>Tool calls on handoff</dt><dd>{{ tool_evaluation.tool_on_handoff }}</dd></dl>
           {% for failure in tool_evaluation.failures %}<small>{{ failure.id }} ({{ failure.group }}): {{ failure.problems|join:"; " }}<br></small>{% endfor %}
         </div>{% endif %}
+        {% if stage == 7 %}<form method="post" action="{% url 'health_evaluate' %}">{% csrf_token %}<button class="secondary" type="submit">Run offline safety evaluation</button></form>{% endif %}
+        {% if health_evaluation %}<div class="result" role="status"><span class="label">SAFETY EVALUATION · {{ health_evaluation.total }} CASES</span>
+          <dl class="state-list"><dt>Categories</dt><dd>{{ health_evaluation.categories }} / {{ health_evaluation.total }}</dd><dt>Emergency recall</dt><dd>{{ health_evaluation.emergency_hits }} / {{ health_evaluation.emergency_total }}</dd>
+            <dt>Model calls on screened emergencies</dt><dd>{{ health_evaluation.model_calls_on_emergency }}</dd><dt>Answers outside clinic admin</dt><dd>{{ health_evaluation.answers_outside_admin }}</dd>
+            <dt>Clinic answers citing the right document</dt><dd>{{ health_evaluation.admin_cited }} / {{ health_evaluation.admin_total }}</dd><dt>Raised by the model</dt><dd>{{ health_evaluation.raised_by_model }}</dd></dl>
+          {% for failure in health_evaluation.failures %}<small>{{ failure.id }} ({{ failure.group }}): {{ failure.problems|join:"; " }}<br></small>{% endfor %}
+        </div>{% endif %}
         <form class="chat-form" method="post" action="{% url 'chat' stage %}">{% csrf_token %}
           <label for="message">Customer message</label>
-          <textarea id="message" name="message" required maxlength="4000" rows="4" placeholder="{% if stage == 4 or stage == agent %}Where is my order?{% elif stage == 5 %}Can I return an opened item?{% elif stage == 6 %}Where is order ORD-1001?{% elif stage == 3 %}What is the return policy?{% else %}How can you help with my order?{% endif %}"></textarea>
+          <textarea id="message" name="message" required maxlength="4000" rows="4" placeholder="{% if stage == 4 or stage == agent %}Where is my order?{% elif stage == 5 %}Can I return an opened item?{% elif stage == 6 %}Where is order ORD-1001?{% elif stage == 7 %}What should I bring to my first visit?{% elif stage == 3 %}What is the return policy?{% else %}How can you help with my order?{% endif %}"></textarea>
           {% if stage == 5 or stage == agent %}<label for="region">Delivery region</label>
           <select id="region" name="region">{% for code, name in regions.items %}<option value="{{ code }}" {% if code == region %}selected{% endif %}>{{ name }}</option>{% endfor %}</select>{% endif %}
           {% if stage == 6 or stage == agent %}<label for="customer">Demo sign-in</label>
@@ -102,6 +113,8 @@
           <p class="hint">Try: “Can I return an opened item?”, “Is cash on delivery available?” with and without a region, and “Do you price match?”</p>{% endif %}
         {% if stage == 6 %}<h2>Read-only tools</h2><p>The only tool is <code>order_status</code>. The model proposes it as validated JSON; code checks the sign-in, ownership and a lookup limit on every call. Another customer's order gets the same reply as a missing one.</p>
           <p class="hint">Try as customer A: “Where is order ORD-1001?”, “Where is order ORD-2001?” and “Cancel my order ORD-1001.”</p>{% endif %}
+        {% if stage == 7 %}<h2>Healthcare support</h2><p>Levels of care, from least to most cautious: out of scope, clinic admin, action request, clinical, emergency. The code screen runs first and an emergency never reaches the model. The model's category can raise the level, never lower it. Only clinic admin questions are answered, from approved clinic documents.</p>
+          <p class="hint">Try: “What should I bring to my first visit?”, “What dose of ibuprofen should I take?”, “Can I take my antibiotic with food?” and “I have chest pain.”</p>{% endif %}
         {% if stage == agent %}<h2>One agent, every module</h2><p>Retrieved evidence (05) backs validated routing (03) and reported facts (04), cited answers use recent context (02), order numbers are looked up with the read-only tool (06), and every reply shows its model metrics (01).</p>
           <p class="hint">Sign in as customer A, then try: “Where is my order?”, then “ORD-1001”, then “What is the return policy?”</p>{% endif %}
         {% if stage == 6 or stage == agent %}<h3>Tool audit trail</h3>
