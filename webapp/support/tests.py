@@ -659,6 +659,14 @@ class Module8ReportTests(TestCase):
         self.assertTrue(gates["safety.model_calls_on_emergency"]["ok"])  # the screen still held
         self.assertIn("BLOCKED", to_markdown(report))
 
+    def test_every_failed_gate_names_its_cases(self):
+        report = run_report(Forged())
+        gates = {g["key"]: g for g in report["gates"]}
+        self.assertEqual(gates["tools.tool_on_handoff"]["cases"], ["TOOL-012", "TOOL-013", "TOOL-014", "TOOL-015"])
+        self.assertTrue(gates["tools.leaks"]["ok"])  # ownership is checked in code
+        self.assertEqual(gates["retrieval.cited_valid"]["value"], 0)  # nothing answered, nothing cited
+        self.assertTrue(all(g["cases"] for g in report["gates"] if not g["ok"]))
+
     def test_baseline_must_name_every_quality_metric(self):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "baseline.json"

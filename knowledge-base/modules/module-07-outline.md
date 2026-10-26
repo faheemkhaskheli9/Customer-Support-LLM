@@ -58,4 +58,4 @@ By the end, learners can:
 
 ## Next module
 
-Module 8 turns the evaluations from Modules 3–7 into one evaluation and safety report.
+[Module 8](module-08-outline.md) turns the evaluations from Modules 3–7 into one evaluation and safety report.

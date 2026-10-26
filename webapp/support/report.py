@@ -50,8 +50,11 @@ def problems(failure: dict) -> list[str]:
 
 
 def failing_cases(results: dict, key: str, keyword: str) -> list[str]:
-    suite = key.split(".")[0]
-    return [f["id"] for f in results[suite]["failures"] if any(keyword in p for p in problems(f))]
+    """A failed gate always names cases: when no problem matches its keyword (a citation metric
+    drops because nothing was answered at all), it names every failing case in the suite."""
+    failures = results[key.split(".")[0]]["failures"]
+    return ([f["id"] for f in failures if any(keyword in p for p in problems(f))]
+            or [f["id"] for f in failures])
 
 
 def run_report(gateway=None, baseline: dict | None = None) -> dict:

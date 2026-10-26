@@ -340,4 +340,4 @@ Extend the web app into **Customer Support Assistant v0.7** and show:
 
 ## What comes next
 
-Module 8 turns the evaluations from Modules 3–7 into one evaluation and safety report: what each number measures, which numbers are invariants that must stay at 0, and what none of them establish.
+[Module 8](module-08.md) turns the evaluations from Modules 3–7 into one evaluation and safety report: what each number measures, which numbers are invariants that must stay at 0, and what none of them establish.

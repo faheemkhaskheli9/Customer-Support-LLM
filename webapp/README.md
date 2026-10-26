@@ -52,7 +52,7 @@ python manage.py check
 python manage.py test support
 ~~~
 
-The 54 tests cover all eight stages, CSRF protection, session isolation, correction, expiry, deletion, invalid model output, both offline evaluations, and Module 5's loader, chunk IDs, filters, region fallback, grounded-answer parser, citations, no-call fallback, poisoned document and hybrid fusion, and Module 6's order loader, tool-request parser, ownership check, sign-in, lookup limit, audit trail, tool evaluation and the agent's order lookups, and Module 7's code screen, triage parser, a model that tries to lower the level of care, clinic-only citations, the safety evaluation and the agent's safety screen, and Module 8's passing report, a model that blocks the release, the baseline check, the report page, the download and the command. The old CLI tests are still available in their historical folders.
+The 55 tests cover all eight stages, CSRF protection, session isolation, correction, expiry, deletion, invalid model output, both offline evaluations, and Module 5's loader, chunk IDs, filters, region fallback, grounded-answer parser, citations, no-call fallback, poisoned document and hybrid fusion, and Module 6's order loader, tool-request parser, ownership check, sign-in, lookup limit, audit trail, tool evaluation and the agent's order lookups, and Module 7's code screen, triage parser, a model that tries to lower the level of care, clinic-only citations, the safety evaluation and the agent's safety screen, and Module 8's passing report, a model that blocks the release, a hijacked model whose failed gates all name cases, the baseline check, the report page, the download and the command. The old CLI tests are still available in their historical folders.
 
 ## Code map
 
