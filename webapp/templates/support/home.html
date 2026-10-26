@@ -38,7 +38,7 @@
         {% if stage == 7 %}<p class="explain">A fictional clinic's support chat. Code screens every message for emergencies, clinical questions and action requests before any model call. Only questions about how the clinic works are answered, from approved clinic documents. Nothing you type here is kept.</p>{% endif %}
         {% if stage == report_stage %}<p class="explain">Runs every offline evaluation from Modules 3, 5, 6 and 7 in one go. Safety gates must hold exactly; quality metrics may not drop below the frozen baseline. Any failed gate blocks the release and names its cases.</p>{% endif %}
         {% if stage == deploy_stage %}<p class="explain">Checks that this configuration and its data are ready to serve traffic. Liveness (<code>/healthz</code>) only says the process answers; readiness (<code>/readyz</code>) runs these checks and returns 503 naming the ones that fail. No check calls a model.</p>{% endif %}
-        {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do; an emergency or health question gets the Module 7 code-written reply before any model call and is not kept. Rate each reply; ratings keep IDs only and appear on the Module 8 report page.</p>{% endif %}
+        {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do; an emergency or health question gets the Module 7 code-written reply before any model call and is not kept. A handoff gives a reference number. Rate each reply; ratings and handoffs keep IDs only and appear on the Module 8 report page.</p>{% endif %}
 
         {% if history %}<div class="history" aria-label="Recent conversation">
           {% for item in history %}<p class="bubble {{ item.role }}"><strong>{{ item.role|title }}</strong><br>{{ item.content }}</p>{% endfor %}
@@ -64,6 +64,9 @@
             {% if result.tool.record %}<div class="source"><strong>{{ result.tool.record.order_reference }} · {{ result.tool.record.status }}</strong>
               <small>{{ result.tool.source }} · checked {{ result.tool.checked_at }} · record updated {{ result.tool.record.updated_at }}</small></div>
             {% else %}<small>No order details were returned. The audit trail records the decision.</small>{% endif %}
+          </div>{% endif %}
+          {% if result.handoff_ref %}<div class="sources" aria-label="Handoff"><span class="label">HANDOFF · {{ result.handoff_ref }}</span>
+            <small>Quote this reference if you contact support. The handoff log keeps the reason and IDs only, not this conversation.</small>
           </div>{% endif %}
           {% if result.feedback_id %}<form class="feedback-form" method="post" action="{% url 'rate' %}">{% csrf_token %}<input type="hidden" name="turn_id" value="{{ result.feedback_id }}">
             <small>Did this reply help?</small>{% for value, label in ratings.items %}<button class="secondary" type="submit" name="rating" value="{{ value }}">{{ label }}</button>{% endfor %}
@@ -118,6 +121,16 @@
           </tbody></table>{% else %}<p class="muted">None yet.</p>{% endif %}
           {% else %}<p class="muted">No ratings yet. Rate replies on the support agent page.</p>{% endif %}
           <small>IDs only: no message text, reply text, customer or session is stored.</small>
+        </div>{% endif %}
+        {% if handoffs %}<div class="result" role="status"><span class="label">HANDOFF LOG · {{ handoffs.total }} HANDOFF{{ handoffs.total|pluralize:"S" }} · NOT A RELEASE GATE</span>
+          {% if handoffs.total %}<table><thead><tr><th>Reason</th><th>Handoffs</th></tr></thead><tbody>
+            {% for r in handoffs.reasons %}<tr><td>{{ r.label }}<br><small>{{ r.reason }}</small></td><td>{{ r.count }}</td></tr>{% endfor %}
+          </tbody></table>
+          <h3>Latest handoffs</h3><table><thead><tr><th>Time</th><th>Reference</th><th>Reason</th><th>Sources</th><th>Tool</th></tr></thead><tbody>
+            {% for h in handoffs.recent %}<tr><td>{{ h.created_at|date:"Y-m-d H:i" }}</td><td>{{ h.reference }}</td><td>{{ h.reason }}</td><td>{{ h.sources|default:"—" }}</td><td>{{ h.tool_decision|default:"—" }}</td></tr>{% endfor %}
+          </tbody></table>
+          {% else %}<p class="muted">No handoffs yet. A support agent reply routed to a person opens one.</p>{% endif %}
+          <small>IDs only: no message text, reply text, customer, order or session is stored.</small>
         </div>{% endif %}
         {% if readiness %}<div class="result verdict-{% if readiness.ready %}pass{% else %}blocked{% endif %}" role="status"><span class="label">READINESS · {% if readiness.ready %}READY{% else %}NOT READY{% endif %}</span>
           <p>{% if readiness.ready %}Every configuration and data check passes.{% else %}Failing: {{ readiness.failing|join:", " }}.{% endif %}</p>

@@ -76,7 +76,7 @@ Five check the database and data:
 
 | Key | Passes when |
 |---|---|
-| `data.database` | the sessions and feedback tables exist |
+| `data.database` | the sessions, feedback and handoff tables exist |
 | `data.corpus` | the corpus loads from disk (43 chunks) |
 | `data.clinic` | the clinic documents load (7 chunks) |
 | `data.orders` | the order records load (5 orders) |

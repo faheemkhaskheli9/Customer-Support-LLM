@@ -25,7 +25,9 @@ from .report import load_baseline, run_report, to_markdown
 from .ops import readiness
 from .health import REPLIES as HEALTH_REPLIES, get_clinic_retriever, parse_triage, screen
 from .tools import MAX_LOOKUPS, get_orders, load_orders, parse_tool_request
-from .models import Feedback
+from .models import Feedback, Handoff
+from .handoffs import reason as handoff_reason
+from .service import Turn
 
 
 class BrokenGateway:
@@ -751,6 +753,56 @@ class FeedbackTests(TestCase):
             self.chat("Where is my order?")
             self.client.post(action, {"stage": "0"})
             self.assertNotIn("agent_feedback", self.client.session)
+
+
+class HandoffTests(TestCase):
+    def chat(self, message, **extra):
+        self.client.post("/chat/0/", {"message": message, **extra})
+        return self.client.session["last_result"].get("handoff_ref", "")
+
+    def test_a_handoff_gets_one_reference_per_conversation_and_ids_only(self):
+        self.assertEqual(self.chat("What is the return policy?"), "")
+        ref = self.chat("I want a refund now", customer="CUST-A")
+        self.assertRegex(ref, r"^HO-[0-9A-F]{8}$")
+        self.assertContains(self.client.get("/"), f"HANDOFF · {ref}")
+        self.assertEqual(self.chat("Cancel my order ORD-1001"), ref)
+        row = Handoff.objects.get()
+        self.assertEqual((row.reference, row.reason), (ref, "needs_review"))
+        stored = json.dumps(list(Handoff.objects.values()), default=str)
+        for text in ("refund", "Cancel", "CUST-A", "ORD-1001", self.client.session.session_key):
+            self.assertNotIn(text, stored)
+
+    def test_the_reason_comes_from_the_turn(self):
+        turn = Turn("ok", "", "handoff", "offline", 0.0, None, None)
+        cases = {"needs_review": turn, "unavailable": replace(turn, status="error"),
+                 "not_confirmed": replace(turn, retrieval={"grounding": "declined"}),
+                 "lookup_limit": replace(turn, tool={"decision": "rate_limited"})}
+        for expected, case in cases.items():
+            self.assertEqual(handoff_reason(case), expected)
+        with patch("support.views.get_gateway", return_value=BrokenGateway()):
+            self.chat("Where is my order?")
+        self.assertEqual(Handoff.objects.get().reason, "unavailable")
+
+    def test_screened_replies_open_no_handoff_and_reset_starts_a_new_reference(self):
+        self.assertEqual(self.chat("I have chest pain."), "")
+        self.assertFalse(Handoff.objects.exists())
+        refs = []
+        for action in ("/reset/0/", "/state/delete/"):
+            refs.append(self.chat("I want a refund now"))
+            self.client.post(action, {"stage": "0"})
+            self.assertNotIn("agent_handoff", self.client.session)
+        self.assertEqual(Handoff.objects.count(), 2)
+        self.assertNotEqual(*refs)
+
+    def test_report_page_shows_handoffs_without_changing_the_verdict(self):
+        self.assertContains(self.client.get("/?stage=8"), "No handoffs yet.")
+        ref = self.chat("I want a refund now")
+        self.client.post("/report/")
+        page = self.client.get("/?stage=8")
+        self.assertContains(page, "HANDOFF LOG · 1 HANDOFF ·")
+        self.assertContains(page, ref)
+        self.assertContains(page, "RELEASE VERDICT · PASS")
+        self.assertNotContains(page, "refund now")
 
 
 # Module 9: the production variables, as settings; the test runner already turns DEBUG off.

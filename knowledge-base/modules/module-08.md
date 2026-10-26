@@ -157,7 +157,7 @@ The rating goes through the same rules as the rest of the app ([`support/feedbac
 
 - **Only the latest reply, once.** `offer` gives each agent reply a random ID and keeps it in the session. `record` accepts that ID once. A forged ID, an older reply and an unknown rating are refused.
 - **The record comes from the session, not the form.** The form sends only the ID and the rating. Route, status, cited document IDs and the tool decision are copied from what the server kept for that reply.
-- **IDs only.** A `Feedback` row ([`support/models.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/models.py)) holds time, reply ID, rating, route, status, sources such as `RET-30 v2` and the tool decision. No message text, reply text, customer, order or session ID. It is the app's only server-side table, so it survives **Delete session data**, and there is nothing in it to delete.
+- **IDs only.** A `Feedback` row ([`support/models.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/models.py)) holds time, reply ID, rating, route, status, sources such as `RET-30 v2` and the tool decision. No message text, reply text, customer, order or session ID. With the handoff log below, it is one of the app's two server-side tables. Both survive **Delete session data**, and there is nothing in them to delete.
 - **Safety-screened replies are not rated.** A Module 7 emergency or clinical reply keeps nothing, so it offers no rating either.
 
 The report page shows the totals, ratings by route and the latest replies that did not help:
@@ -165,6 +165,23 @@ The report page shows the totals, ratings by route and the latest replies that d
 ![The customer feedback panel under the release verdict](images/module-08-feedback-report.png)
 
 Feedback is **not a release gate**. Ratings are opinions from a small, self-selected group, and they change with traffic, not with the code. A reply that did not help is a lead: find the route and sources, write the message as a new case in `data/rag_cases.jsonl` or `data/tool_cases.jsonl`, and the next report gates it.
+
+### Handoffs with a reference number
+
+A handoff reply says a person will review the request, but before this change nobody could find which conversation it was. Now every support agent reply routed to `handoff` shows a reference ([`support/handoffs.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/handoffs.py)):
+
+![A support agent handoff with its HO- reference](images/module-08-handoff-reference.png)
+
+- **One per conversation.** `open_handoff` creates a `Handoff` row and keeps its reference in the session. Later handoffs in the same conversation show the same reference instead of adding rows. **Reset module** and **Delete session data** start a new one.
+- **The reason comes from code.** `reason` reads the turn: `unavailable` for a failed turn, `not_confirmed` when the cited answer was declined or invalid, `lookup_limit` when the order lookups are used up, and `needs_review` when the router chose handoff. Model text never sets it.
+- **IDs only.** The row holds time, reference, reason, cited document IDs and the tool decision. No message, reply, customer, order or session ID, so staff see why it was escalated, not what was said.
+- **Safety-screened replies open none.** A Module 7 emergency or clinical reply keeps nothing, so it gets no reference either.
+
+The report page counts handoffs by reason and lists the latest:
+
+![The handoff log under the customer feedback panel](images/module-08-handoff-log.png)
+
+Like feedback, the handoff log is **not a release gate**. A rising `not_confirmed` count points at missing approved documents; a rising `unavailable` count points at the provider.
 
 ## 6. Break it
 
@@ -236,7 +253,7 @@ All 55 tests run without a network or API key. The 5 Module 8 tests are in the `
 - a baseline that does not name every metric being rejected;
 - the page, the Markdown download and the command, including exit code 1 when blocked.
 
-The 5 feedback tests are in the `FeedbackTests` class (66 tests in all). They cover a reply rated once with an IDs-only record, forged IDs, unknown ratings and older replies refused, cited sources recorded and screened replies not rated, the report page panel with an unchanged verdict, and delete and reset dropping the pending rating.
+The 5 feedback tests are in the `FeedbackTests` class and the 4 handoff tests in `HandoffTests` (70 tests in all). They cover a reply rated once with an IDs-only record, forged IDs, unknown ratings and older replies refused, cited sources recorded and screened replies not rated, the report page panel with an unchanged verdict, and delete and reset dropping the pending rating; and one handoff reference per conversation with an IDs-only record, the reason set from the turn, no handoff for screened replies, a new reference after reset or delete, and the handoff panel with an unchanged verdict.
 
 ## 9. Common mistakes
 
