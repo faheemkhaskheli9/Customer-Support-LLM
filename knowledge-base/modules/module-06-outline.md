@@ -5,7 +5,7 @@
 > **Level:** Beginner to practical LLM engineering  
 > **Learning loop:** Build → Break → Measure → Improve
 
-**Implementation:** Module 6 extends the shared [Django web app](../../webapp/) with the page at `/?stage=6` (`tool_turn` in `support/service.py`, the tool layer in `support/tools.py`).
+**Implementation:** Module 6 extends the shared [Django web app](../../webapp/) with the page at `/?stage=6` (`tool_turn` in `support/service.py`, the tool layer in `support/tools.py`). The article is [module-06.md](module-06.md).
 
 ## Module mission
 
