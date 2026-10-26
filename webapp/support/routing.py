@@ -1,8 +1,9 @@
-"""Modules 3 and 4: strict model JSON validation and application-owned routes."""
+"""Modules 3-5: strict model JSON validation and application-owned routes."""
 
 from __future__ import annotations
 
 import json
+import re
 
 from .gateway import ROUTES
 from .state import ALLOWED_FACTS
@@ -10,6 +11,10 @@ from .state import ALLOWED_FACTS
 COMMON = {"intent", "route", "missing_information", "response_draft", "needs_human_review"}
 STAGE3 = COMMON | {"summary"}
 STAGE4 = COMMON | {"pending_question", "fact_updates"}
+MAX_ANSWER = 1200
+# Heuristic with a known limit: it catches common completed-action phrasing, not every paraphrase.
+ACTIONS = r"(?:approved|refunded|cancell?ed|processed|issued|reversed|booked|rescheduled|prescribed|changed|completed)"
+ACTION_CLAIM = re.compile(rf"\b(?:(?:has|have|had)\s+been|was|were|I(?:'ve|\s+have)?)\s+{ACTIONS}\b", re.I)
 
 
 def parse_route(raw: str, policy: str, stage: int) -> dict:
@@ -64,3 +69,27 @@ def customer_response(route: dict) -> str:
             return "What is the order number?"
         return "Please share the missing information so support can continue."
     return route["response_draft"]
+
+
+def parse_grounded(raw: str, passage_count: int) -> tuple[str, list[int]]:
+    """Module 5 boundary: the model may only point at passage numbers it was given."""
+    try:
+        result = json.loads(raw)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("Model did not return valid JSON") from exc
+    if not isinstance(result, dict) or set(result) != {"answer", "used_passages"}:
+        raise ValueError("Grounded answer keys differ")
+    answer, used = result["answer"], result["used_passages"]
+    if not isinstance(answer, str) or len(answer) > MAX_ANSWER:
+        raise ValueError("Invalid answer text")
+    if (not isinstance(used, list) or len(set(map(str, used))) != len(used)
+            or any(type(n) is not int or not 1 <= n <= passage_count for n in used)):
+        raise ValueError("Citation refers to a passage that was not retrieved")
+    answer = answer.strip()
+    if not answer:
+        return "", []  # a decline: the passages do not answer the question
+    if not used:
+        raise ValueError("Answer has no citation")
+    if ACTION_CLAIM.search(answer):
+        raise ValueError("Answer claims an action was completed")
+    return answer, used
