@@ -9,7 +9,7 @@
 | Trust | 08 | Evaluation and safety report |
 | Operations | 09 | Deployment and runbook |
 
-Module 3 introduces structured output and validation. [Module 4](../modules/module-04-outline.md) applies them to conversation state, corrections, retention, deletion, and session isolation. [Module 5](../modules/module-05-outline.md) adds RAG. [Module 6](../modules/module-06-outline.md) adds a read-only order tool behind permission checks. [Module 7](../modules/module-07-outline.md) applies the course to a clinic support assistant with an emergency and clinical screen in code. [Module 8](../modules/module-08-outline.md) runs every evaluation as one report with exact safety gates, a frozen quality baseline and a release verdict.
+Module 3 introduces structured output and validation. [Module 4](../modules/module-04-outline.md) applies them to conversation state, corrections, retention, deletion, and session isolation. [Module 5](../modules/module-05-outline.md) adds RAG. [Module 6](../modules/module-06-outline.md) adds a read-only order tool behind permission checks. [Module 7](../modules/module-07-outline.md) applies the course to a clinic support assistant with an emergency and clinical screen in code. [Module 8](../modules/module-08-outline.md) runs every evaluation as one report with exact safety gates, a frozen quality baseline and a release verdict. [Module 9](../modules/module-09-outline.md) deploys the app with production settings, liveness and readiness endpoints, a release check and a runbook.
 
 The same [Django web app](../../webapp/) grows throughout these modules. Select a stage to compare an earlier capability with the new one. The separate CLI folders are historical companions.
 

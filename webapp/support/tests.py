@@ -732,6 +732,9 @@ class Module9DeploymentTests(TestCase):
             with patch("support.management.commands.release_check.run_report", return_value=run_report(Lowering())), \
                     self.assertRaisesRegex(CommandError, "report blocked by Module 7 safety: Emergency recall"):
                 call_command("release_check", stdout=StringIO(), stderr=StringIO())
+            with patch("support.management.commands.release_check.run_report", side_effect=ValueError("bad front matter")), \
+                    self.assertRaisesRegex(CommandError, "report could not run"):
+                call_command("release_check", stdout=StringIO(), stderr=StringIO())
         with self.assertRaisesRegex(CommandError, "config.secret_key, config.https"):
             call_command("release_check", stdout=StringIO(), stderr=StringIO())
 

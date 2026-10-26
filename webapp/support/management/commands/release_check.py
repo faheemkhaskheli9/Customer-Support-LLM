@@ -22,10 +22,15 @@ class Command(BaseCommand):
         except SystemCheckError as exc:
             self.stderr.write(str(exc))
             failed.append("Django deploy checks")
-        report = run_report()
-        self.stdout.write(f"Evaluation report: {report['verdict']}")
-        if report["blocked"]:
-            failed.append("report blocked by " + "; ".join(report["blocked"]))
+        try:
+            report = run_report()
+        except (OSError, ValueError, KeyError) as exc:  # a broken data file is a failed check, not a crash
+            self.stdout.write(f"Evaluation report: could not run ({exc})")
+            failed.append("report could not run")
+        else:
+            self.stdout.write(f"Evaluation report: {report['verdict']}")
+            if report["blocked"]:
+                failed.append("report blocked by " + "; ".join(report["blocked"]))
         if failed:
             raise CommandError("Not ready to deploy: " + " | ".join(failed))
         self.stdout.write("Ready to deploy.")
