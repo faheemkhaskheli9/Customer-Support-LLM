@@ -36,5 +36,6 @@ This knowledge base is the working curriculum and product reference for building
 - [Module 2](docs/module-02.md): bounded multi-turn context and controlled failures.
 - [Module 3](knowledge-base/modules/module-03.md): validated support routes and a 24-case offline evaluation.
 - [Module 4](knowledge-base/modules/module-04.md): reported facts, corrections, browser-session isolation, retention, expiry, and deletion.
+- [Module 5](knowledge-base/modules/module-05.md): retrieval from a versioned approved corpus, citations from metadata, a no-evidence fallback, and a 34-case retrieval evaluation.
 
 The older `module-01/` through `module-04/` CLI packages remain for existing published links. They are historical references; new features are added to `webapp/`. Previous article versions are kept under `docs/legacy/` and `knowledge-base/modules/legacy/`.

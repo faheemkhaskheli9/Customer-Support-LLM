@@ -91,13 +91,13 @@ Before building anything, be clear about what retrieval buys and what it costs. 
 
 The Module 4 policy file is 266 characters. Pasting it into every prompt costs almost nothing, and nothing can go wrong in choosing *which* policy to show, because there is only one. At that size, retrieval would be pure overhead.
 
-The Module 5 corpus is different. It has 19 document versions split into 43 passages ("chunks"). If you took every passage a Pakistani customer is allowed to see today, 33 passages, and pasted them into the prompt, that would be 6,658 characters, about 1,100 words. Across the 28 evaluation questions where retrieval found evidence, the top three passages averaged **375 characters**, and the largest was 748. That is roughly one eighteenth of the full set on an average question.
+The Module 5 corpus is different. It has 19 document versions split into 43 passages ("chunks"). If you took every passage a Pakistani customer is allowed to see today, 33 passages, and pasted them into the prompt, that would be 3,916 characters, about 670 words. Across the 28 evaluation questions where retrieval found evidence, the top three passages averaged **268 characters**, and the largest was 488. That is roughly one fifteenth of the full set on an average question.
 
 A few thousand characters is still small for a modern model. Size alone is not the strongest argument here, and with a corpus this small you could reasonably paste everything. The stronger arguments are about **correctness and auditability**:
 
 - **Versions.** Pasting everything means pasting the retired price-match rule, the unapproved loyalty draft, and the returns policy that does not start until 2027. You would then have to tell the model, in words, to ignore them. A filter in code is more reliable than an instruction in a prompt.
 - **Regions.** The Pakistani and UAE delivery documents disagree on cash on delivery. The model would have to work out which one applies from context.
-- **Traceability.** With retrieval, every answer comes from a known, small set of passages, and we can record their IDs. With everything pasted, the honest citation for any answer is "somewhere in 6,658 characters".
+- **Traceability.** With retrieval, every answer comes from a known, small set of passages, and we can record their IDs. With everything pasted, the honest citation for any answer is "somewhere in 3,916 characters".
 
 So the rule of thumb for this course is:
 
@@ -235,9 +235,11 @@ def split_text(text: str, size: int = MAX_CHARS, overlap: int = OVERLAP) -> list
         pieces.append(text[start:end].strip())
         if end >= len(text):
             break
-        start = max(end - overlap, start + 1)
-        while start < len(text) and not text[start - 1].isspace():
-            start += 1  # begin the next piece on a word boundary
+        start = boundary = max(end - overlap, start + 1)
+        while boundary < end and not text[boundary - 1].isspace():
+            boundary += 1  # begin the next piece on a word boundary, if the overlap has one
+        if boundary < end:
+            start = boundary
     return [p for p in pieces if p]
 ~~~
 
@@ -245,9 +247,9 @@ Three details matter:
 
 - **Cut at a space, not mid-word.** `rfind(" ", start, end)` moves the end back to the last space in the window. A chunk ending in "retur" retrieves worse and reads worse.
 - **Overlap.** The next piece starts `OVERLAP = 120` characters before the previous one ended, so a sentence that straddles a boundary appears whole in at least one chunk.
-- **Always move forward.** `max(end - overlap, start + 1)` guarantees progress. Without it, a window with no spaces, or an overlap close to the window size, could compute the same `start` again and loop forever. This bug is common in hand-written chunkers because it only shows up with unusual input. `test_split_text_keeps_words_and_moves_forward` feeds 700 words through the splitter and checks that no piece exceeds 800 characters, no word is cut in half, and the last word arrives.
+- **Always move forward, and never skip text.** `max(end - overlap, start + 1)` guarantees progress. Without it, a window with no spaces, or an overlap close to the window size, could compute the same `start` again and loop forever. The word-boundary search is limited to the overlap: an earlier draft kept searching to the end of the text, so a 2,000-character string with no spaces came back as one 800-character piece and the rest silently vanished. Both bugs are common in hand-written chunkers because they only show up with unusual input. `test_split_text_keeps_words_and_moves_forward` feeds 700 words through the splitter and checks that no piece exceeds 800 characters, no word is cut in half, and the last word arrives, then checks that 2,000 characters with no spaces become pieces of 800, 800 and 640.
 
-Our corpus sections are short (the longest chunk is 232 characters, the average 131), so in practice every section becomes exactly one chunk. The size split is there because real articles are not this tidy, and because you should see the edge cases handled before you need them.
+Our corpus sections are short (the longest chunk is 203 characters, the average 118), so in practice every section becomes exactly one chunk. The size split is there because real articles are not this tidy, and because you should see the edge cases handled before you need them.
 
 ### Chunk IDs are hashes of content and position
 
@@ -332,7 +334,8 @@ The honest answer is "it depends on where you are". The retriever notices this c
 passages = tuple(self.chunks[i] for i in order[:k])
 if passages:
     reason = "found"
-elif any(r == "other_region" and keyword[i] >= MIN_SCORE for i, r in enumerate(reasons)):
+elif any(r == "other_region" and self.index.score(i, query) >= self.min_score
+         for i, r in enumerate(reasons)):
     reason = "region_needed"
 else:
     reason = "no_match"
@@ -390,23 +393,23 @@ Here are the real scores for "Can I return an opened item?" with no region, as t
 
 | Document | Section | Keyword score | Used |
 |---|---|---|---|
-| RET-30 | Opened items | 9.91 | yes |
-| RET-30 | Return window | 4.26 | yes |
-| DMG-01 | Reporting a damaged item | 3.43 | no |
-| RET-30 | How a return is reviewed | 2.37 | no |
-| DMG-01 | What happens next | 1.89 | no |
+| RET-30 | Opened items | 8.76 | yes |
+| RET-30 | Return window | 3.72 | yes |
+| EXC-01 | How an exchange works | 3.65 | yes |
+| DMG-01 | What happens next | 2.90 | no |
+| DMG-01 | Reporting a damaged item | 2.62 | no |
 
-And "filtered out before ranking: draft 2, retired 1, superseded 2, not yet effective 2, other region 6". Those 13 chunks never received a score at all.
+And "filtered out before ranking: draft 2, retired 1, superseded 2, not yet effective 2, other region 6". Those 13 chunks never entered the ranking. (The only ones scored at all are the 6 other-region chunks, and only to decide whether to ask for a region, as described above.)
 
-Why only two passages used when `TOP_K = 3`? Because of the next rule.
+Why are the two damaged-items passages not used? Because of the next rule.
 
 ### The relevance threshold
 
-A passage must score at least `MIN_SCORE = 3.5` to count as evidence. The damaged-items chunk scored 3.43 because it shares "item" with the question. It is not about returning an opened item, and the threshold keeps it out.
+A passage must score at least `MIN_SCORE = 3.5` to count as evidence. The damaged-items chunks scored 2.90 and 2.62 because they share "item" and "return" with the question. They are not about returning an opened item, and the threshold keeps them out. The exchanges chunk (3.65, "Send the original item back first… checks the returned item") just clears it: a reminder that a threshold is a trade-off, not a classifier.
 
 The threshold is what turns "top three passages" into "top three passages *that are actually evidence*", and it's what makes the no-evidence fallback possible. Without it, every question retrieves *something*, including "What is the weather today?", and the model is asked to answer from three irrelevant passages. That is exactly the situation in which a model is most likely to produce a confident, cited-looking, wrong answer.
 
-3.5 was not picked from the air. Section 9 shows the sweep over the evaluation set. The short version: 2.5 lets through false matches (an early probe matched "How long does delivery take?" to the clinic's "a list of the medicines you currently take"), and 4.0 starts losing real answers. 3.5 is the best trade-off this corpus and these 34 cases support. It is a property of *this* corpus and *this* tokenizer. Change either and you re-measure.
+3.5 was not picked from the air. Section 9 shows the sweep over the evaluation set. The short version: 2.5 lets through false matches ("Can I get a discount on my return?" answered with return-window text), and 4.0 starts losing real answers. 3.5 is the best trade-off this corpus and these 34 cases support. It is a property of *this* corpus and *this* tokenizer. Change either and you re-measure.
 
 ### Hybrid retrieval: keyword plus embeddings
 
@@ -449,7 +452,7 @@ class ConceptEmbedder:
         return [[sum(t.lower().count(w) for w in words) for words in self.CONCEPTS] + [0.01] for t in texts]
 ~~~
 
-With it, `test_hybrid_embeddings_rescue_a_roman_urdu_question` shows keyword retrieval returning nothing for the Roman Urdu question, and hybrid retrieval returning RET-30 first, still only version 2. This test does not prove a real embedding model handles Roman Urdu well. It proves the fusion and gating code does what we claim when an embedding model does. Whether a particular model delivers is a question for the live evaluation, with your own cases.
+With it, `test_hybrid_embeddings_rescue_a_roman_urdu_question` shows keyword retrieval returning nothing for the Roman Urdu question, and hybrid retrieval returning RET-30 among its passages, still only version 2. Notice it is not first: every chunk that mentions returning gets the same cosine from this one-concept fake, so the fusion falls back to keyword rank, and "item" puts the exchanges chunk ahead. This test does not prove a real embedding model handles Roman Urdu well. It proves the fusion and gating code does what we claim when an embedding model does. Whether a particular model delivers is a question for the live evaluation, with your own cases.
 
 Two warnings before you switch hybrid on:
 
@@ -633,7 +636,7 @@ What a real deployment needs beyond this lab:
 
 A citation nobody can see does not build trust. The Module 5 page puts the evidence on screen in three places.
 
-**Sources, under the answer.** Each cited passage shows its number, title and section heading, then `RET-30 v2 · effective 2026-06-01 · returns-v2.md · chunk 1823249f76d9e002`, then the passage text in quotation marks. A support agent reviewing a transcript can go from any answer to the exact file, version and chunk that backed it.
+**Sources, under the answer.** Each cited passage shows its number, title and section heading, then `RET-30 v2 · effective 2026-06-01 · returns-v2.md · chunk 767e3f7b61cb1774`, then the passage text in quotation marks. A support agent reviewing a transcript can go from any answer to the exact file, version and chunk that backed it.
 
 **Retrieval, in a collapsible panel.** It shows the retrieval reason (`found`, `no_match`, `region_needed`), the grounding label, a table of up to five candidate passages with keyword score, cosine score (0 in keyword mode) and whether each was used, and a line like "Filtered out before ranking: draft 2 · retired 1 · superseded 2 · not_yet_effective 2 · other_region 6". This panel is for learning and debugging. In a customer-facing product you would show sources and keep scores in logs.
 
@@ -757,7 +760,7 @@ From the Module 5 page, click **Run offline retrieval evaluation**, or from `mod
 | Metric | Result |
 |---|---|
 | Recall@3 | 23 / 24 |
-| MRR | 0.938 |
+| MRR | 0.958 |
 | Fallback recall | 5 / 6 |
 | Fallback precision | 5 / 6 |
 | Forbidden passages retrieved | 0 |
@@ -767,7 +770,7 @@ From the Module 5 page, click **Run offline retrieval evaluation**, or from `mod
 
 The two hard invariants, zero forbidden passages and zero generation on a miss, hold. Two cases fail, and both are worth understanding rather than fixing by editing the case.
 
-**RAG-008: "What is the delivery charge?" with no region.** The expected behaviour is "choose your region", since delivery charges differ by country. What happened: keyword search matched the *billing* document on "charge" (after stemming, "charged" and "charges" become `charg`), it cleared the threshold, and the assistant answered "A support professional reviews every disputed charge. The chatbot cannot issue a refund or reverse a charge.", cited to BIL-01, Disputed charges. The region-specific delivery documents were filtered correctly. The failure is a keyword collision with a document that applies to every region. The citation even looks valid. It's approved and current, just about the wrong thing. That's why citation validity is 23/24 and not 24/24: the evaluation checks the cited document against the *expected* one, not just against the retrieved set.
+**RAG-008: "What is the delivery charge?" with no region.** The expected behaviour is "choose your region", since delivery charges differ by country. What happened: keyword search matched the *billing* document on "charge" (after stemming, "charged" and "charges" become `charg`), it cleared the threshold, and the assistant answered "If you were charged twice or do not recognise a charge, contact support with the order number. A support professional reviews every disputed charge.", cited to BIL-01, Disputed charges. The region-specific delivery documents were filtered correctly. The failure is a keyword collision with a document that applies to every region. The citation even looks valid. It's approved and current, just about the wrong thing. That's why citation validity is 23/24 and not 24/24: the evaluation checks the cited document against the *expected* one, not just against the retrieved set.
 
 How would you fix it? Some options: add "delivery charge" wording to both delivery documents' headings so they outscore billing (a content fix); detect region-dependent topics and ask for a region before retrieving (a routing fix); or accept it and rely on the live model declining, since the billing passage does not actually answer the question (a generation fix). There's no single right answer, and it's exercise 3 in the notebook for exactly that reason.
 
@@ -787,18 +790,18 @@ Here is the relevance threshold swept across the frozen cases, keyword mode, off
 
 | `MIN_SCORE` | Recall@3 | Fallback recall | Fallback precision | Routes | Citation validity | Failing cases |
 |---|---|---|---|---|---|---|
-| 2.0 | 24 / 24 | 4 / 6 | 4 / 4 | 32 / 34 | 23 / 26 | RAG-008, 029, 034 |
-| 2.5 | 24 / 24 | 4 / 6 | 4 / 4 | 32 / 34 | 23 / 26 | RAG-008, 029, 034 |
-| 3.0 | 23 / 24 | 5 / 6 | 5 / 5 | 33 / 34 | 23 / 25 | RAG-008, 034 |
+| 2.0 | 24 / 24 | 3 / 6 | 3 / 3 | 30 / 34 | 23 / 26 | RAG-006, 008, 029, 034 |
+| 2.5 | 23 / 24 | 3 / 6 | 3 / 3 | 30 / 34 | 23 / 26 | RAG-006, 008, 029, 034 |
+| 3.0 | 23 / 24 | 5 / 6 | 5 / 6 | 32 / 34 | 23 / 24 | RAG-008, 034 |
 | **3.5** | **23 / 24** | **5 / 6** | **5 / 6** | **32 / 34** | **23 / 24** | **RAG-008, 034** |
-| 4.0 | 21 / 24 | 6 / 6 | 6 / 9 | 31 / 34 | 21 / 21 | RAG-011, 017, 034 |
-| 5.0 | 20 / 24 | 6 / 6 | 6 / 10 | 30 / 34 | 20 / 20 | RAG-004, 011, 017, 034 |
+| 4.0 | 22 / 24 | 5 / 6 | 5 / 7 | 31 / 34 | 22 / 23 | RAG-008, 011, 034 |
+| 5.0 | 20 / 24 | 6 / 6 | 6 / 10 | 30 / 34 | 20 / 20 | RAG-004, 010, 011, 034 |
 
 Read it carefully, because the most tempting row is the wrong one.
 
-- At **2.0–2.5**, recall is perfect, and the cost is that RAG-029 ("Can I get a discount on my return?") finds the returns policy on the word "return" and answers a discount question with return-window text. Low thresholds turn "no approved information" into "a confident answer about something else".
-- At **3.0**, routes score 33/34, better than 3.5. But look at *why*. The Roman Urdu case, which falls back at 3.5, now retrieves the damaged-items document on the word "item" and answers from it. The route matches the expected `answer_from_approved_info`, so the route metric counts it as a success. It is a wrong answer with a real, approved, current citation to the wrong policy. The citation-validity column catches it (23/25).
-- At **4.0 and above**, the assistant becomes timid. "When will my order arrive?" (Pakistan) and "Why was I charged twice?" start falling back even though the answer is in the corpus. Fallback precision drops to 6/9 and 6/10: a third of its refusals are refusals it shouldn't make.
+- At **2.0–2.5**, every case that expects evidence is either found or nearly found, and the cost lands on the fallback cases. RAG-029 ("Can I get a discount on my return?") finds the returns policy on the word "return" and answers a discount question with return-policy text. RAG-006 ("Is cash on delivery available?" with no region) matches the gift-card and returns chunks on "cash" and "delivery", so instead of asking for a region it answers from the wrong documents. Low thresholds turn "no approved information" into "a confident answer about something else". Notice that recall at 2.0 is perfect even for the Roman Urdu case: "item" alone drags the returns policy into the top three. A perfect recall row is not a good row.
+- At **3.0**, this corpus and these cases give exactly the same results as 3.5. That doesn't make the two values equivalent. It means the frozen set has no case between them. Pick the value with more margin from the false matches you saw (the poisoning and region cases fail at 2.5) and keep watching the near-misses in the Retrieval panel, such as the exchanges chunk at 3.65 for "Can I return an opened item?".
+- At **4.0 and above**, the assistant becomes timid. "When will my order arrive?" (Pakistan), then "Is the return period 45 days now?" and "Do you ship to Dubai?" (UAE), start falling back even though the answer is in the corpus. Fallback precision drops to 5/7 and 6/10: at 5.0, four of its ten refusals are refusals it shouldn't make. Citation validity reaches 20/20, which looks perfect and is only perfect because the assistant answers so little.
 
 3.5 is the value where every remaining failure is either a known limit (Roman Urdu) or a single diagnosed collision (RAG-008), and where no wrong-document answers are hiding inside a passing route. The lesson generalises: **never pick a threshold from the single metric that looks best. Look at which cases moved, and what the customer would have seen.**
 
@@ -822,14 +825,14 @@ What these numbers do **not** establish: production accuracy, multilingual quali
 
 Everything above is covered by tests that need no network or API key.
 
-**Web app** (27 tests, from `webapp/`):
+**Web app** (28 tests, from `webapp/`):
 
 ~~~bash
 python manage.py check
 python manage.py test support
 ~~~
 
-The Module 5 tests are in the `Module5RetrievalTests` class in [`support/tests.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/tests.py): front-matter rejection, idempotent and content-addressed IDs, the splitter, filters before ranking on two dates, the region filter and region fallback, drafts and retired documents never retrieved, the grounded-answer parser, citations from metadata, a miss that never calls the answer model, the poisoned document, hybrid fusion with a fake embedder, the frozen evaluation's invariants, and the Module 5 page rendering sources and the evaluation. The agent tests were updated for `/?stage=0` and now also check that the router receives only retrieved evidence and that a miss makes exactly one model call.
+The Module 5 tests are in the `Module5RetrievalTests` class in [`support/tests.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/tests.py): front-matter rejection, idempotent and content-addressed IDs, the splitter, filters before ranking on two dates, the region filter and region fallback, drafts and retired documents never retrieved, the grounded-answer parser, citations from metadata, a miss that never calls the answer model, the poisoned document, hybrid fusion with a fake embedder, the frozen evaluation's invariants, and the Module 5 page rendering sources and the evaluation. The agent tests were updated for `/?stage=0` and now also check that the router receives only retrieved evidence, that a miss makes exactly one model call, and that the region comes only from the fixed list and is removed by **Delete session data**.
 
 **Standalone package** (30 tests, from `module-05/`):
 

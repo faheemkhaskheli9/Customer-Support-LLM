@@ -8,19 +8,24 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from .gateway import get_gateway
-from .evaluation import run_offline_evaluation
-from .service import active_state, agent_turn, process_turn
+from .evaluation import run_offline_evaluation, run_rag_evaluation
+from .retrieval import corpus_table, get_retriever
+from .service import active_state, agent_turn, process_turn, rag_turn
 from .state import correct_fact, is_expired
 
 POLICY = (Path(__file__).resolve().parents[1] / "data" / "approved_policy.txt").read_text(encoding="utf-8")
-AGENT = 5
+AGENT = 0
 STAGES = {  # insertion order is nav order: the main agent first, then the lessons
-    AGENT: ("Support agent", "All four modules in one conversation"),
+    AGENT: ("Support agent", "All five modules in one conversation"),
     1: ("First model call", "One message, support rules, and usage measurements"),
     2: ("Multi-turn chat", "Bounded conversation context and controlled failures"),
     3: ("Prompt routing", "Versioned instructions, validated JSON, and handoff routes"),
     4: ("Safe memory", "Fact corrections, review, retention, expiry, and deletion"),
+    5: ("Approved retrieval", "Versioned documents, filters first, citations, and a no-evidence fallback"),
 }
+# Region is application-owned access control, validated here, never extracted by the model.
+REGIONS = {"": "Not set", "PK": "Pakistan", "AE": "United Arab Emirates"}
+RETRIEVAL_STAGES = (5, AGENT)
 HISTORY_KEYS = {2: "m2_history", 3: "m3_history", AGENT: "agent_history"}
 
 
@@ -40,28 +45,46 @@ def home(request):
     if stage == 4:
         request.session.pop("m2_history", None)
         request.session.pop("m3_history", None)
+    corpus = corpus_rows(request) if stage in RETRIEVAL_STAGES else []
     return render(request, "support/home.html", {
         "stage": stage, "stages": STAGES, "stage_title": STAGES[stage][0], "agent": AGENT,
         "history": request.session.get(HISTORY_KEYS.get(stage, ""), []),
         "state": state, "result": request.session.pop("last_result", None),
         "evaluation": request.session.pop("evaluation", None),
         "notice": request.session.pop("notice", None),
-        "policy": POLICY if stage >= 3 else "",
+        "policy": POLICY if stage in (3, 4) else "",
+        "regions": REGIONS, "region": request.session.get("region", ""),
+        "region_name": REGIONS.get(request.session.get("region", ""), "Not set"),
+        "rag_evaluation": request.session.pop("rag_evaluation", None),
+        "corpus": corpus,
     })
+
+
+def corpus_rows(request) -> list[dict]:
+    try:
+        return corpus_table(get_retriever().chunks, request.session.get("region", ""))
+    except RuntimeError as exc:  # hybrid mode without a working embedder
+        request.session["notice"] = str(exc)
+        return []
 
 
 @require_POST
 def chat(request, stage: int):
     if stage not in STAGES:
         return redirect("home")
+    if stage in RETRIEVAL_STAGES and "region" in request.POST and request.POST["region"] in REGIONS:
+        request.session["region"] = request.POST.get("region", "")
+    region = request.session.get("region", "")
     try:
         if stage == AGENT:
             turn = agent_turn(message=request.POST.get("message", ""), session=request.session,
-                              gateway=get_gateway(), policy=POLICY)
+                              gateway=get_gateway(), region=region)
+        elif stage == 5:
+            turn = rag_turn(message=request.POST.get("message", ""), gateway=get_gateway(), region=region)
         else:
             turn = process_turn(stage=stage, message=request.POST.get("message", ""),
                                 session=request.session, gateway=get_gateway(),
-                                policy=POLICY if stage >= 3 else "")
+                                policy=POLICY if stage in (3, 4) else "")
         request.session["last_result"] = turn.as_dict()
     except (ValueError, RuntimeError) as exc:
         request.session["notice"] = str(exc)
@@ -72,6 +95,12 @@ def chat(request, stage: int):
 def evaluate(request):
     request.session["evaluation"] = run_offline_evaluation()
     return redirect("/?stage=3")
+
+
+@require_POST
+def rag_evaluate(request):
+    request.session["rag_evaluation"] = run_rag_evaluation()
+    return redirect("/?stage=5")
 
 
 @require_POST
@@ -111,6 +140,7 @@ def delete_state(request):
     request.session.pop("m3_history", None)
     request.session.pop("agent_history", None)
     request.session.pop("last_result", None)
+    request.session.pop("region", None)
     request.session["notice"] = "Course session state removed from this server-side session."
     return back(request)
 

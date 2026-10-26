@@ -11,21 +11,21 @@
   <div class="shell">
     <header class="site-header">
       <div><p class="eyebrow">BUILD → BREAK → MEASURE → IMPROVE</p><h1>Customer Support LLM</h1>
-        <p class="subtitle">One web app. Four steps from first model call to safe conversation state.</p></div>
+        <p class="subtitle">One web app. Five steps from first model call to cited answers from approved documents.</p></div>
       <span class="badge">Fictional data only</span>
     </header>
 
     <nav class="modules" aria-label="Course modules">
       {% for number, description in stages.items %}
       <a class="module {% if number == stage %}active{% endif %}" href="/?stage={{ number }}" {% if number == stage %}aria-current="page"{% endif %}>
-        <span class="step">{% if number == agent %}1–4{% else %}0{{ number }}{% endif %}</span><strong>{{ description.0 }}</strong><small>{{ description.1 }}</small>
+        <span class="step">{% if number == agent %}1–5{% else %}0{{ number }}{% endif %}</span><strong>{{ description.0 }}</strong><small>{{ description.1 }}</small>
       </a>
       {% endfor %}
     </nav>
 
     <main class="grid">
       <section class="panel conversation" aria-labelledby="workspace-title">
-        <div class="panel-head"><div><p class="eyebrow">{% if stage == agent %}MODULES 01–04{% else %}MODULE 0{{ stage }}{% endif %}</p><h2 id="workspace-title">{{ stage_title }}</h2></div>
+        <div class="panel-head"><div><p class="eyebrow">{% if stage == agent %}MODULES 01–05{% else %}MODULE 0{{ stage }}{% endif %}</p><h2 id="workspace-title">{{ stage_title }}</h2></div>
           <form method="post" action="{% url 'reset' stage %}">{% csrf_token %}<button class="secondary" type="submit">Reset module</button></form>
         </div>
         {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
@@ -33,22 +33,45 @@
         {% if stage == 2 %}<p class="explain">The last four exchanges remain in this browser session. The assistant can use that short context.</p>{% endif %}
         {% if stage == 3 %}<p class="explain">A fixed route and validated JSON turn each message into a support decision. No action tool is available.</p>{% endif %}
         {% if stage == 4 %}<p class="explain">Review and correct reported facts. A browser session is isolated, expires after 30 minutes, and stores no full Module 4 transcript.</p>{% endif %}
-        {% if stage == agent %}<p class="explain">The main support agent. Each message is routed and updates the reported facts; approved-policy answers use the recent conversation. It hands off anything it must not do.</p>{% endif %}
+        {% if stage == 5 %}<p class="explain">Each question retrieves approved, current passages for your region. Answers cite them; with no evidence, a fixed reply comes from code and the answer model is never called.</p>{% endif %}
+        {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. It hands off anything it must not do.</p>{% endif %}
 
         {% if history %}<div class="history" aria-label="Recent conversation">
           {% for item in history %}<p class="bubble {{ item.role }}"><strong>{{ item.role|title }}</strong><br>{{ item.content }}</p>{% endfor %}
         </div>{% endif %}
         {% if result %}<div class="result" role="status"><span class="label">{{ result.status|upper }} · {{ result.route }}</span>
           <p>{{ result.response }}</p><small>Model: {{ result.model }} · {{ result.latency_ms }} ms · Input tokens: {{ result.input_tokens|default:"—" }} · Output tokens: {{ result.output_tokens|default:"—" }}</small>
+          {% if result.sources %}<div class="sources" aria-label="Sources"><span class="label">SOURCES</span>
+            {% for source in result.sources %}<div class="source"><strong>[{{ source.n }}] {{ source.title }} — {{ source.heading }}</strong>
+              <small>{{ source.doc_id }} v{{ source.version }} · effective {{ source.effective_date }} · {{ source.source }} · chunk {{ source.chunk_id }}</small>
+              <blockquote>“{{ source.excerpt }}”</blockquote></div>{% endfor %}
+          </div>{% endif %}
+          {% if result.retrieval %}<details class="retrieval"><summary>Retrieval · {{ result.retrieval.reason }} · grounding: {{ result.retrieval.grounding }}</summary>
+            <small>Mode: {{ result.retrieval.mode }}</small>
+            {% if result.retrieval.candidates %}<table><thead><tr><th>Document</th><th>Section</th><th>Keyword</th><th>Cosine</th><th>Used</th></tr></thead><tbody>
+              {% for c in result.retrieval.candidates %}<tr><td>{{ c.doc_id }}</td><td>{{ c.heading }}</td><td>{{ c.keyword }}</td><td>{{ c.cosine }}</td><td>{% if c.used %}yes{% else %}no{% endif %}</td></tr>{% endfor %}
+            </tbody></table>{% else %}<p class="muted">No eligible passage matched.</p>{% endif %}
+            <small>Filtered out before ranking: {% for reason, count in result.retrieval.excluded.items %}{{ reason }} {{ count }}{% if not forloop.last %} · {% endif %}{% empty %}none{% endfor %}</small>
+          </details>{% endif %}
         </div>{% endif %}
         {% if stage == 3 %}<form method="post" action="{% url 'evaluate' %}">{% csrf_token %}<button class="secondary" type="submit">Run offline routing evaluation</button></form>{% endif %}
         {% if evaluation %}<div class="result" role="status"><span class="label">OFFLINE REGRESSION</span>
           <p>{{ evaluation.matched }} / {{ evaluation.total }} expected routes · {{ evaluation.schema_valid }} valid schemas</p>
           {% for failure in evaluation.failures %}<small>{{ failure.id }}: expected {{ failure.expected }}, got {{ failure.actual }}<br></small>{% endfor %}
         </div>{% endif %}
+        {% if stage == 5 %}<form method="post" action="{% url 'rag_evaluate' %}">{% csrf_token %}<button class="secondary" type="submit">Run offline retrieval evaluation</button></form>{% endif %}
+        {% if rag_evaluation %}<div class="result" role="status"><span class="label">FROZEN RETRIEVAL EVALUATION · {{ rag_evaluation.total }} CASES · {{ rag_evaluation.date }}</span>
+          <dl class="state-list"><dt>Recall@3</dt><dd>{{ rag_evaluation.recall_hits }} / {{ rag_evaluation.recall_total }}</dd><dt>MRR</dt><dd>{{ rag_evaluation.mrr }}</dd>
+            <dt>Fallback recall</dt><dd>{{ rag_evaluation.fallback_hits }} / {{ rag_evaluation.fallback_total }}</dd><dt>Fallback precision</dt><dd>{{ rag_evaluation.fallback_correct }} / {{ rag_evaluation.fallback_returned }}</dd>
+            <dt>Forbidden passages</dt><dd>{{ rag_evaluation.forbidden }}</dd><dt>Generation on miss</dt><dd>{{ rag_evaluation.generation_on_miss }}</dd>
+            <dt>Routes</dt><dd>{{ rag_evaluation.routes }} / {{ rag_evaluation.total }}</dd><dt>Citation validity</dt><dd>{{ rag_evaluation.cited_valid }} / {{ rag_evaluation.answered }}</dd></dl>
+          {% for failure in rag_evaluation.failures %}<small>{{ failure.id }} ({{ failure.group }}): {{ failure.problems|join:"; " }}<br></small>{% endfor %}
+        </div>{% endif %}
         <form class="chat-form" method="post" action="{% url 'chat' stage %}">{% csrf_token %}
           <label for="message">Customer message</label>
-          <textarea id="message" name="message" required maxlength="4000" rows="4" placeholder="{% if stage == 4 or stage == agent %}Where is my order?{% elif stage == 3 %}What is the return policy?{% else %}How can you help with my order?{% endif %}"></textarea>
+          <textarea id="message" name="message" required maxlength="4000" rows="4" placeholder="{% if stage == 4 or stage == agent %}Where is my order?{% elif stage == 5 %}Can I return an opened item?{% elif stage == 3 %}What is the return policy?{% else %}How can you help with my order?{% endif %}"></textarea>
+          {% if stage == 5 or stage == agent %}<label for="region">Delivery region</label>
+          <select id="region" name="region">{% for code, name in regions.items %}<option value="{{ code }}" {% if code == region %}selected{% endif %}>{{ name }}</option>{% endfor %}</select>{% endif %}
           <div class="form-foot"><small>Do not enter real customer or patient data.</small><button type="submit">Send message</button></div>
         </form>
       </section>
@@ -61,7 +84,9 @@
           <p class="hint">Try: “My order is A123”, then “What is my order number?”</p>{% endif %}
         {% if stage == 3 %}<h2>Structured routing</h2><p>Valid routes are answer from approved information, clarify, handoff, or unsupported. An invalid model result fails safely.</p>
           <p class="hint">Try: “Cancel my order” and “What is the return policy?”</p>{% endif %}
-        {% if stage == agent %}<h2>One agent, every module</h2><p>Validated routing (03) and reported facts (04) decide each turn, approved-policy answers use recent context (02), and every reply shows its model metrics (01).</p>
+        {% if stage == 5 %}<h2>Approved retrieval</h2><p>Only approved, current passages for your region can be retrieved. Citations come from retrieval metadata, never from the model's text.</p>
+          <p class="hint">Try: “Can I return an opened item?”, “Is cash on delivery available?” with and without a region, and “Do you price match?”</p>{% endif %}
+        {% if stage == agent %}<h2>One agent, every module</h2><p>Retrieved evidence (05) backs validated routing (03) and reported facts (04), cited answers use recent context (02), and every reply shows its model metrics (01).</p>
           <p class="hint">Try: “Where is my order?”, then “A123”, then “What is the return policy?”</p>{% endif %}
         {% if stage == 4 or stage == agent %}<h2>Current state</h2>
           <dl class="state-list"><dt>Pending question</dt><dd>{{ state.pending_question|default:"None" }}</dd><dt>Route</dt><dd>{{ state.last_route|default:"None" }}</dd>
@@ -77,6 +102,10 @@
             <select id="retention-choice" name="choice"><option value="session_only" {% if state.retention_choice == 'session_only' %}selected{% endif %}>This browser session</option><option value="until_expiry" {% if state.retention_choice == 'until_expiry' %}selected{% endif %}>Until expiry in this server</option></select><button class="secondary" type="submit">Update</button></form>
           <form method="post" action="{% url 'delete_state' %}">{% csrf_token %}<input type="hidden" name="stage" value="{{ stage }}"><button class="danger" type="submit">Delete session data</button></form>
         {% endif %}
+        {% if corpus %}<details class="policy"><summary>Approved fictional corpus · region: {{ region_name }}</summary>
+          <table class="corpus"><thead><tr><th>Document</th><th>Status</th><th>Chunks</th><th>Use today</th></tr></thead><tbody>
+            {% for doc in corpus %}<tr><td>{{ doc.doc_id }} v{{ doc.version }}<br><small>{{ doc.title }} · effective {{ doc.effective_date }} · region {{ doc.region }}</small></td><td>{{ doc.status }}</td><td>{{ doc.chunks }}</td><td>{{ doc.use_today }}</td></tr>{% endfor %}
+          </tbody></table></details>{% endif %}
         {% if policy %}<details class="policy"><summary>Approved fictional policy</summary><p>{{ policy|linebreaksbr }}</p></details>{% endif %}
         <p class="disclaimer">Teaching prototype. It cannot verify identity, complete business actions, or make medical decisions.</p>
       </aside>
