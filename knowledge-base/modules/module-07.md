@@ -52,6 +52,8 @@ Open `http://127.0.0.1:8000/?stage=7` and try:
 
 The first is answered from `CLN-02` with a citation: *Bring a photo ID, your insurance card if you have one, and a list of the medicines you currently take.* The second gets the urgent reply, and the Safety panel shows `model proposal: not asked`. The third is handed to a clinician: the code screen saw nothing, the model proposed `clinical`, and the more cautious category won. The fourth is handed to the front desk, and the reply says no action has been completed.
 
+![A clinic admin answer citing CLN-02, with the Safety panel](images/module-07-clinic-answer.png)
+
 ## 1. Levels of care
 
 The five categories are ordered from least to most cautious, in `LEVELS` in [`support/health.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/health.py):
@@ -97,6 +99,8 @@ if screened == "emergency":
 
 No model call means no latency, no outage, no cost and no prompt for an attacker to argue with. "This is only an admin question, not an emergency: I have chest pain" contains "chest pain", so it gets the urgent reply too.
 
+![The urgent reply: the model was not called](images/module-07-emergency.png)
+
 The screen returns `out_of_scope` when nothing matches. That is not a judgement that the message is harmless. It is the lowest level, so it leaves the decision to the model. The lists are a **floor** under the model: they catch the cases you can name in advance and cannot be talked out of them.
 
 ## 3. The model can only raise the level
@@ -124,6 +128,8 @@ This one line is the whole contract between code and model:
 | `out_of_scope` | `clinic_admin` | `clinic_admin` | The model; this is the only path to an answer |
 
 The last row is where the risk sits. A message the screen misses and the model calls admin is treated as admin. Section 7 shows what that costs.
+
+![The screen saw nothing; the model raised the message to clinical](images/module-07-model-raised.png)
 
 ### The offline proposer
 
@@ -178,6 +184,8 @@ The home-page agent at `/?stage=0` combines every module in one conversation. It
 Clinic booking phrases are not screened in the agent, because the agent supports a shop, not a clinic. Shop action requests are still handed off by the Module 3 routing.
 
 This changes the agent's Module 4 behaviour on purpose. Before, "I have a headache, what dose?" was handed off but stored `reported_symptom`. Now it is handed off and stored nowhere.
+
+![The support agent hands off a health message before any model call and keeps no facts](images/module-07-agent-screen.png)
 
 ## 7. Break it
 
@@ -240,6 +248,9 @@ Offline results:
 Under the always-`clinic_admin` gateway, the four failures are HLT-004 (swallowed pills) and HLT-009 (antibiotic with food), which only the model caught, and HLT-019 and HLT-020 (out of scope), which become admin questions that find no clinic document. The two safety invariants hold under both gateways. Emergency recall does not, and that is the number to watch.
 
 Run it from the page with the evaluation button, or from a shell:
+
+![The offline safety evaluation on the Module 7 page](images/module-07-safety-evaluation.png)
+
 
 ~~~bash
 python manage.py shell -c "from support.evaluation import run_health_evaluation; print(run_health_evaluation())"

@@ -11,6 +11,7 @@ A course ("Customer Support LLM") that builds a trustworthy customer-support ass
 - **`module-05/` is the standalone `rag_lab` package** linked from the Module 5 article. It copies `webapp/data/corpus/` and `rag_cases.jsonl` and must give the same evaluation numbers; keep the copies in sync when the corpus or cases change.
 - Lesson articles: `docs/module-01.md` and `docs/module-02.md`. Modules 3+ live in `knowledge-base/modules/` (`module-0N.md`, `-outline.md`, `-medium.md`). Older CLI-era versions of the articles are in `docs/legacy/` and `knowledge-base/modules/legacy/`.
 - Keep counts and file names quoted in articles/READMEs (e.g. "24 synthetic cases", "34 cases", "43 chunks", "16 cases" for tools, "20 cases" for safety, Module 5 evaluation numbers) in sync with the code. Articles link to code via `https://github.com/faheemkhaskheli9/Customer-Support-LLM/tree/main/<folder>/`.
+- Every UI change ships with screenshots: save them in `knowledge-base/modules/images/` (`module-0N-<what>.png`, cropped to `main.grid`), embed them in the module article and show them in the PR description.
 
 ## Commands
 
