@@ -38,7 +38,7 @@
         {% if stage == 7 %}<p class="explain">A fictional clinic's support chat. Code screens every message for emergencies, clinical questions and action requests before any model call. Only questions about how the clinic works are answered, from approved clinic documents. Nothing you type here is kept.</p>{% endif %}
         {% if stage == report_stage %}<p class="explain">Runs every offline evaluation from Modules 3, 5, 6 and 7 in one go. Safety gates must hold exactly; quality metrics may not drop below the frozen baseline. Any failed gate blocks the release and names its cases.</p>{% endif %}
         {% if stage == deploy_stage %}<p class="explain">Checks that this configuration and its data are ready to serve traffic. Liveness (<code>/healthz</code>) only says the process answers; readiness (<code>/readyz</code>) runs these checks and returns 503 naming the ones that fail. No check calls a model.</p>{% endif %}
-        {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do; an emergency or health question gets the Module 7 code-written reply before any model call and is not kept.</p>{% endif %}
+        {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do; an emergency or health question gets the Module 7 code-written reply before any model call and is not kept. Rate each reply; ratings keep IDs only and appear on the Module 8 report page.</p>{% endif %}
 
         {% if history %}<div class="history" aria-label="Recent conversation">
           {% for item in history %}<p class="bubble {{ item.role }}"><strong>{{ item.role|title }}</strong><br>{{ item.content }}</p>{% endfor %}
@@ -65,6 +65,9 @@
               <small>{{ result.tool.source }} · checked {{ result.tool.checked_at }} · record updated {{ result.tool.record.updated_at }}</small></div>
             {% else %}<small>No order details were returned. The audit trail records the decision.</small>{% endif %}
           </div>{% endif %}
+          {% if result.feedback_id %}<form class="feedback-form" method="post" action="{% url 'rate' %}">{% csrf_token %}<input type="hidden" name="turn_id" value="{{ result.feedback_id }}">
+            <small>Did this reply help?</small>{% for value, label in ratings.items %}<button class="secondary" type="submit" name="rating" value="{{ value }}">{{ label }}</button>{% endfor %}
+          </form>{% endif %}
         </div>{% endif %}
         {% if stage == 3 %}<form method="post" action="{% url 'evaluate' %}">{% csrf_token %}<button class="secondary" type="submit">Run offline routing evaluation</button></form>{% endif %}
         {% if evaluation %}<div class="result" role="status"><span class="label">OFFLINE REGRESSION</span>
@@ -103,6 +106,18 @@
           <h3>Quality against the baseline</h3><table><thead><tr><th>Suite</th><th>Metric</th><th>Value</th><th>Baseline</th><th>Result</th></tr></thead><tbody>
             {% for g in report.gates %}{% if g.kind == "quality" %}<tr{% if not g.ok %} class="fail"{% endif %}><td>{{ g.suite }}</td><td>{{ g.label }}{% if g.cases %}<br><small>{{ g.cases|join:", " }}</small>{% endif %}</td><td>{{ g.value }} / {{ g.total }}</td><td>{{ g.expected }}</td><td>{% if g.ok %}pass{% else %}FAIL{% endif %}</td></tr>{% endif %}{% endfor %}
           </tbody></table>
+        </div>{% endif %}
+        {% if feedback %}<div class="result" role="status"><span class="label">CUSTOMER FEEDBACK · {{ feedback.total }} RATINGS · NOT A RELEASE GATE</span>
+          {% if feedback.total %}<p>{{ feedback.helpful }} of {{ feedback.total }} rated agent replies helped. A reply that did not help is a candidate for a new evaluation case.</p>
+          <table><thead><tr><th>Route</th><th>Helpful</th><th>Not helpful</th></tr></thead><tbody>
+            {% for r in feedback.routes %}<tr><td>{{ r.route }}</td><td>{{ r.helpful }}</td><td>{{ r.not_helpful }}</td></tr>{% endfor %}
+          </tbody></table>
+          <h3>Latest replies that did not help</h3>
+          {% if feedback.recent %}<table><thead><tr><th>Time</th><th>Reply</th><th>Route · status</th><th>Sources</th><th>Tool</th></tr></thead><tbody>
+            {% for f in feedback.recent %}<tr><td>{{ f.created_at|date:"Y-m-d H:i" }}</td><td><small>{{ f.turn_id|truncatechars:9 }}</small></td><td>{{ f.route }} · {{ f.status }}</td><td>{{ f.sources|default:"—" }}</td><td>{{ f.tool_decision|default:"—" }}</td></tr>{% endfor %}
+          </tbody></table>{% else %}<p class="muted">None yet.</p>{% endif %}
+          {% else %}<p class="muted">No ratings yet. Rate replies on the support agent page.</p>{% endif %}
+          <small>IDs only: no message text, reply text, customer or session is stored.</small>
         </div>{% endif %}
         {% if readiness %}<div class="result verdict-{% if readiness.ready %}pass{% else %}blocked{% endif %}" role="status"><span class="label">READINESS · {% if readiness.ready %}READY{% else %}NOT READY{% endif %}</span>
           <p>{% if readiness.ready %}Every configuration and data check passes.{% else %}Failing: {{ readiness.failing|join:", " }}.{% endif %}</p>

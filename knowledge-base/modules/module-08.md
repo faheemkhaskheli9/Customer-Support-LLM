@@ -147,6 +147,25 @@ Each failed gate carries `cases`. `failing_cases` picks the suite's failures who
 
 All three use the same `run_report` and `to_markdown`. There is one definition of "pass".
 
+### Customer feedback next to the report
+
+The cases are written by the course. Real customers find replies the cases miss. So every support agent reply (`/`) now ends with **Helpful** and **Not helpful**:
+
+![A support agent reply with the Helpful and Not helpful buttons](images/module-08-feedback-buttons.png)
+
+The rating goes through the same rules as the rest of the app ([`support/feedback.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/feedback.py)):
+
+- **Only the latest reply, once.** `offer` gives each agent reply a random ID and keeps it in the session. `record` accepts that ID once. A forged ID, an older reply and an unknown rating are refused.
+- **The record comes from the session, not the form.** The form sends only the ID and the rating. Route, status, cited document IDs and the tool decision are copied from what the server kept for that reply.
+- **IDs only.** A `Feedback` row ([`support/models.py`](https://github.com/faheemkhaskheli9/Customer-Support-LLM/blob/main/webapp/support/models.py)) holds time, reply ID, rating, route, status, sources such as `RET-30 v2` and the tool decision. No message text, reply text, customer, order or session ID. It is the app's only server-side table, so it survives **Delete session data**, and there is nothing in it to delete.
+- **Safety-screened replies are not rated.** A Module 7 emergency or clinical reply keeps nothing, so it offers no rating either.
+
+The report page shows the totals, ratings by route and the latest replies that did not help:
+
+![The customer feedback panel under the release verdict](images/module-08-feedback-report.png)
+
+Feedback is **not a release gate**. Ratings are opinions from a small, self-selected group, and they change with traffic, not with the code. A reply that did not help is a lead: find the route and sources, write the message as a new case in `data/rag_cases.jsonl` or `data/tool_cases.jsonl`, and the next report gates it.
+
 ## 6. Break it
 
 Predict the verdict first, then run each one. The gateways are the test doubles in `support/tests.py`; from `webapp/`:
@@ -216,6 +235,8 @@ All 55 tests run without a network or API key. The 5 Module 8 tests are in the `
 - `Forged` failing tool calls on handoff (TOOL-012 to TOOL-015) with no leaks, and every failed gate naming cases;
 - a baseline that does not name every metric being rejected;
 - the page, the Markdown download and the command, including exit code 1 when blocked.
+
+The 5 feedback tests are in the `FeedbackTests` class (66 tests in all). They cover a reply rated once with an IDs-only record, forged IDs, unknown ratings and older replies refused, cited sources recorded and screened replies not rated, the report page panel with an unchanged verdict, and delete and reset dropping the pending rating.
 
 ## 9. Common mistakes
 

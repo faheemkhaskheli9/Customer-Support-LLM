@@ -8,6 +8,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from . import feedback
 from .gateway import get_gateway
 from .ops import RUNBOOK, readiness
 from .report import run_report, to_markdown
@@ -81,6 +82,8 @@ def home(request):
         "report": request.session.pop("report", None),
         # Module 9: read-only and cheap, so the checks run on every visit to the page.
         "readiness": readiness() if stage == DEPLOY_STAGE else None, "runbook": RUNBOOK,
+        # Customer ratings sit next to the report but never change its verdict.
+        "feedback": feedback.summary() if stage == REPORT_STAGE else None, "ratings": feedback.RATINGS,
     })
 
 
@@ -119,7 +122,10 @@ def chat(request, stage: int):
             turn = process_turn(stage=stage, message=request.POST.get("message", ""),
                                 session=request.session, gateway=get_gateway(),
                                 policy=POLICY if stage in (3, 4) else "")
-        request.session["last_result"] = turn.as_dict()
+        result = turn.as_dict()
+        if stage == AGENT:
+            result["feedback_id"] = feedback.offer(request.session, turn)
+        request.session["last_result"] = result
     except (ValueError, RuntimeError) as exc:
         request.session["notice"] = str(exc)
     return redirect(f"/?stage={stage}")
@@ -175,6 +181,16 @@ def readyz(request):
 
 
 @require_POST
+def rate(request):
+    try:
+        feedback.record(request.session, request.POST.get("turn_id", ""), request.POST.get("rating", ""))
+        request.session["notice"] = "Thank you. Your rating was recorded without the conversation text."
+    except ValueError as exc:
+        request.session["notice"] = str(exc)
+    return redirect(f"/?stage={AGENT}")
+
+
+@require_POST
 def correct(request):
     state = request.session.get("m4_state")
     if not state or is_expired(state):
@@ -210,6 +226,7 @@ def delete_state(request):
     request.session.pop("m2_history", None)
     request.session.pop("m3_history", None)
     request.session.pop("agent_history", None)
+    request.session.pop(feedback.PENDING_KEY, None)
     request.session.pop("last_result", None)
     request.session.pop("region", None)
     for key in ("customer", "m6_lookups", "tool_audit"):
@@ -228,6 +245,7 @@ def reset(request, stage: int):
         request.session.pop("m4_state", None)
         if stage == AGENT:
             request.session.pop("agent_history", None)
+            request.session.pop(feedback.PENDING_KEY, None)
     if stage in TOOL_STAGES:
         request.session.pop("tool_audit", None)
     request.session.pop("last_result", None)

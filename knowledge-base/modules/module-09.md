@@ -76,7 +76,7 @@ Five check the database and data:
 
 | Key | Passes when |
 |---|---|
-| `data.database` | the sessions table exists |
+| `data.database` | the sessions and feedback tables exist |
 | `data.corpus` | the corpus loads from disk (43 chunks) |
 | `data.clinic` | the clinic documents load (7 chunks) |
 | `data.orders` | the order records load (5 orders) |
@@ -142,7 +142,7 @@ pass  config.secret_key    Secret key is set (DJANGO_SECRET_KEY is set and is no
 pass  config.hosts         Allowed hosts are named (DJANGO_ALLOWED_HOSTS: support.example.com)
 pass  config.https         HTTPS only (secure cookies and DJANGO_SECURE_SSL_REDIRECT=1)
 pass  config.backend       Model backend is configured (offline / keyword)
-pass  data.database        Sessions table exists (migrations applied)
+pass  data.database        Database tables exist (migrations applied)
 pass  data.corpus          Corpus loads (43 chunks)
 pass  data.clinic          Clinic documents load (7 clinic chunks)
 pass  data.orders          Order records load (5 orders)

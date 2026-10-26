@@ -13,6 +13,7 @@ urlpatterns = [
     path("report.md", views.report_markdown, name="report_markdown"),
     path("healthz", views.healthz, name="healthz"),
     path("readyz", views.readyz, name="readyz"),
+    path("feedback/", views.rate, name="rate"),
     path("state/correct/", views.correct, name="correct"),
     path("state/retention/", views.retention, name="retention"),
     path("state/delete/", views.delete_state, name="delete_state"),
