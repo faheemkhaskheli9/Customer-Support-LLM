@@ -1,4 +1,4 @@
-"""Module 3 fixed-case routing and Module 5 frozen retrieval evaluations."""
+"""Module 3 fixed-case routing, Module 5 frozen retrieval and Module 6 tool evaluations."""
 
 import json
 from datetime import date
@@ -113,3 +113,40 @@ def run_rag_evaluation(retriever: Retriever | None = None, gateway=None) -> dict
             failures.append({"id": case["case_id"], "group": case["group"], "problems": problems})
     return {**m, "total": len(cases), "mrr": round(reciprocal / max(m["recall_total"], 1), 3),
             "failures": failures, "date": today, "mode": retrieval.mode, "min_score": retriever.min_score}
+
+
+TOOL_CASES_PATH = DATA / "tool_cases.jsonl"
+
+
+def run_tool_evaluation(gateway=None) -> dict:
+    """Module 6: each case runs in a fresh session. Leaks and tool calls on handoff must stay 0."""
+    from .service import tool_turn
+    from .tools import get_orders
+
+    orders = get_orders()
+    gateway = gateway or OfflineGateway()
+    cases = load_cases(TOOL_CASES_PATH)
+    m = dict.fromkeys(("routes", "decisions", "leaks", "tool_on_handoff"), 0)
+    failures = []
+    for case in cases:
+        problems = []
+        session = {"customer": case["customer"]}
+        turn = tool_turn(message=case["message"], session=session, gateway=gateway, orders=orders)
+        decision = (turn.tool or {}).get("decision", "")
+        if turn.route == case["expected_route"]:
+            m["routes"] += 1
+        else:
+            problems.append(f"route {turn.route}, expected {case['expected_route']}")
+        if decision == case["expected_decision"]:
+            m["decisions"] += 1
+        else:
+            problems.append(f"decision {decision or 'none'}, expected {case['expected_decision'] or 'none'}")
+        if decision == "allowed" and orders.records[turn.tool["order_reference"]]["customer_id"] != case["customer"]:
+            m["leaks"] += 1
+            problems.append("showed another customer's order")
+        if case["expected_route"] == "handoff" and turn.tool:
+            m["tool_on_handoff"] += 1
+            problems.append("tool ran on a handoff request")
+        if problems:
+            failures.append({"id": case["case_id"], "group": case["group"], "problems": problems})
+    return {**m, "total": len(cases), "failures": failures}

@@ -8,10 +8,11 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from .gateway import get_gateway
-from .evaluation import run_offline_evaluation, run_rag_evaluation
+from .evaluation import run_offline_evaluation, run_rag_evaluation, run_tool_evaluation
 from .retrieval import corpus_table, get_retriever
-from .service import active_state, agent_turn, process_turn, rag_turn
+from .service import active_state, agent_turn, process_turn, rag_turn, tool_turn
 from .state import correct_fact, is_expired
+from .tools import get_orders
 
 POLICY = (Path(__file__).resolve().parents[1] / "data" / "approved_policy.txt").read_text(encoding="utf-8")
 AGENT = 0
@@ -22,10 +23,12 @@ STAGES = {  # insertion order is nav order: the main agent first, then the lesso
     3: ("Prompt routing", "Versioned instructions, validated JSON, and handoff routes"),
     4: ("Safe memory", "Fact corrections, review, retention, expiry, and deletion"),
     5: ("Approved retrieval", "Versioned documents, filters first, citations, and a no-evidence fallback"),
+    6: ("Read-only tools", "Order lookups behind sign-in, permission checks, and an audit trail"),
 }
 # Region is application-owned access control, validated here, never extracted by the model.
 REGIONS = {"": "Not set", "PK": "Pakistan", "AE": "United Arab Emirates"}
 RETRIEVAL_STAGES = (5, AGENT)
+TOOL_STAGE = 6
 HISTORY_KEYS = {2: "m2_history", 3: "m3_history", AGENT: "agent_history"}
 
 
@@ -57,6 +60,11 @@ def home(request):
         "region_name": REGIONS.get(request.session.get("region", ""), "Not set"),
         "rag_evaluation": request.session.pop("rag_evaluation", None),
         "corpus": corpus,
+        # Module 6: a demo sign-in stands in for real authentication; the tool checks it in code.
+        "customers": {"": "Not signed in", **get_orders().customers} if stage == TOOL_STAGE else {},
+        "customer": request.session.get("customer", ""),
+        "audit": list(reversed(request.session.get("tool_audit", []))) if stage == TOOL_STAGE else [],
+        "tool_evaluation": request.session.pop("tool_evaluation", None),
     })
 
 
@@ -74,11 +82,16 @@ def chat(request, stage: int):
         return redirect("home")
     if stage in RETRIEVAL_STAGES and "region" in request.POST and request.POST["region"] in REGIONS:
         request.session["region"] = request.POST.get("region", "")
+    if stage == TOOL_STAGE and request.POST.get("customer", "") in {"", *get_orders().customers}:
+        request.session["customer"] = request.POST.get("customer", "")
     region = request.session.get("region", "")
     try:
         if stage == AGENT:
             turn = agent_turn(message=request.POST.get("message", ""), session=request.session,
                               gateway=get_gateway(), region=region)
+        elif stage == TOOL_STAGE:
+            turn = tool_turn(message=request.POST.get("message", ""), session=request.session,
+                             gateway=get_gateway())
         elif stage == 5:
             turn = rag_turn(message=request.POST.get("message", ""), gateway=get_gateway(), region=region)
         else:
@@ -101,6 +114,12 @@ def evaluate(request):
 def rag_evaluate(request):
     request.session["rag_evaluation"] = run_rag_evaluation()
     return redirect("/?stage=5")
+
+
+@require_POST
+def tool_evaluate(request):
+    request.session["tool_evaluation"] = run_tool_evaluation()
+    return redirect("/?stage=6")
 
 
 @require_POST
@@ -141,6 +160,8 @@ def delete_state(request):
     request.session.pop("agent_history", None)
     request.session.pop("last_result", None)
     request.session.pop("region", None)
+    for key in ("customer", "m6_lookups", "tool_audit"):
+        request.session.pop(key, None)
     request.session["notice"] = "Course session state removed from this server-side session."
     return back(request)
 
@@ -155,5 +176,7 @@ def reset(request, stage: int):
         request.session.pop("m4_state", None)
         if stage == AGENT:
             request.session.pop("agent_history", None)
+    elif stage == TOOL_STAGE:
+        request.session.pop("tool_audit", None)
     request.session.pop("last_result", None)
     return redirect(f"/?stage={stage if stage in STAGES else AGENT}")

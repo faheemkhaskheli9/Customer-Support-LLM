@@ -1,12 +1,13 @@
 # Customer Support LLM — one evolving web app
 
-This Django app is the active code for Modules 1–5. Select a module in the top navigation. Each stage adds a capability to the same application:
+This Django app is the active code for Modules 1–6. Select a module in the top navigation. Each stage adds a capability to the same application:
 
 1. **Module 1:** one model call, support instructions, latency and token usage.
 2. **Module 2:** bounded multi-turn context; failed calls do not corrupt history.
 3. **Module 3:** four support routes on bounded context, strict JSON validation, and an offline regression button.
 4. **Module 4:** reported facts, corrections, browser-session isolation, retention choice, expiry, and deletion.
 5. **Module 5** (`/?stage=5`): retrieval from the fictional, versioned corpus in `data/corpus/` (19 document versions, 43 chunks). Eligibility filters (approved, in effect, current version, delivery region) run before BM25 ranking; a relevance threshold decides what counts as evidence. With no evidence, a fixed reply comes from code and the answer model is never called. Citations are built from retrieval metadata. The page shows Sources, a Retrieval panel, the corpus with each version's status, and a 34-case offline retrieval evaluation.
+6. **Module 6** (`/?stage=6`): a read-only `order_status` tool over the fictional records in `data/orders.json`. The model only proposes a call as strict JSON (`parse_tool_request`); code checks a demo sign-in, that the order belongs to the signed-in customer, and a per-session lookup limit, then writes the reply from the record. Another customer's order gets the same reply as a missing one. Action, clinical and instruction-override requests are handed off without a tool call. Every decision goes to an audit trail holding IDs only. The page has a 16-case offline tool evaluation.
 
 The home page (`/?stage=0`) is the **Support agent**, which has every module's feature in one conversation (`agent_turn` in `support/service.py`). It works in three steps:
 
@@ -47,7 +48,7 @@ python manage.py check
 python manage.py test support
 ~~~
 
-The 28 tests cover all five stages, CSRF protection, session isolation, correction, expiry, deletion, invalid model output, both offline evaluations, and Module 5's loader, chunk IDs, filters, region fallback, grounded-answer parser, citations, no-call fallback, poisoned document and hybrid fusion. The old CLI tests are still available in their historical folders.
+The 39 tests cover all six stages, CSRF protection, session isolation, correction, expiry, deletion, invalid model output, both offline evaluations, and Module 5's loader, chunk IDs, filters, region fallback, grounded-answer parser, citations, no-call fallback, poisoned document and hybrid fusion, and Module 6's order loader, tool-request parser, ownership check, sign-in, lookup limit, audit trail and tool evaluation. The old CLI tests are still available in their historical folders.
 
 ## Code map
 
@@ -55,15 +56,16 @@ The 28 tests cover all five stages, CSRF protection, session isolation, correcti
 - `support/service.py`: stage progression and response metrics.
 - `support/corpus.py`: Module 5 strict front-matter loader, heading-first chunking, content-addressed chunk IDs.
 - `support/retrieval.py`: eligibility filters, BM25, optional embeddings with rank fusion, threshold, citations.
+- `support/tools.py`: Module 6 tool registry, order loader, tool-request parser, permission checks, code-written replies and audit entries.
 - `support/routing.py`: Module 3/4 output validation, the Module 5 grounded-answer parser, and application-owned handoff replies.
 - `support/state.py`: Module 4 state transitions and correction rules.
-- `support/evaluation.py`: Module 3 fixed-case evaluation and the Module 5 frozen retrieval evaluation (`data/rag_cases.jsonl`, pinned to 2026-09-29).
+- `support/evaluation.py`: Module 3 fixed-case evaluation and the Module 5 frozen retrieval evaluation (`data/rag_cases.jsonl`, pinned to 2026-09-29) and the Module 6 tool evaluation (`data/tool_cases.jsonl`).
 - `support/views.py`: HTTP forms, CSRF-protected actions, and browser sessions.
 - `templates/support/home.html` and `static/support.css`: the web interface.
 - `support/tests.py`: end-to-end teaching checks.
 
 ## Boundaries
 
-Use fictional data only. This prototype has no user account system, order API, clinical validation, or durable product database. Django isolates sessions by browser cookie, not by verified customer identity. Module 4 saves structured reported facts in the server-side session and removes earlier Module 2 and Module 3 raw history when entering Module 4. Session data can remain in SQLite until expiry or cleanup even after the browser closes. Deletion removes this prototype's session keys; it cannot assert anything about external logs or backups.
+Use fictional data only. This prototype has no user account system, real order API, clinical validation, or durable product database. Django isolates sessions by browser cookie, not by verified customer identity. Module 4 saves structured reported facts in the server-side session and removes earlier Module 2 and Module 3 raw history when entering Module 4. Session data can remain in SQLite until expiry or cleanup even after the browser closes. Deletion removes this prototype's session keys; it cannot assert anything about external logs or backups.
 
-The application cannot complete refunds, cancellations, or medical decisions. Schema validation checks shape, not whether a model extracted a true fact. A citation proves which approved passage an answer came from, not that the answer is faithful to it. The delivery region comes from a select box, not a verified account.
+The application cannot complete refunds, cancellations, or medical decisions. Schema validation checks shape, not whether a model extracted a true fact. A citation proves which approved passage an answer came from, not that the answer is faithful to it. The delivery region and the Module 6 demo sign-in come from select boxes, not verified accounts. The Module 6 audit trail lives in the browser session, so deletion removes it; a real audit log would be kept server-side and could not be deleted by the customer.

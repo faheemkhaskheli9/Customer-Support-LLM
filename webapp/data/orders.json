@@ -1,0 +1,13 @@
+{
+  "customers": {
+    "CUST-A": "Demo customer A",
+    "CUST-B": "Demo customer B"
+  },
+  "orders": [
+    {"order_reference": "ORD-1001", "customer_id": "CUST-A", "status": "in_transit", "carrier": "Northwind Couriers", "estimated_delivery": "2026-10-29", "delivered_on": "", "updated_at": "2026-10-25T09:40:00+00:00"},
+    {"order_reference": "ORD-1002", "customer_id": "CUST-A", "status": "delivered", "carrier": "Northwind Couriers", "estimated_delivery": "", "delivered_on": "2026-10-18", "updated_at": "2026-10-18T15:05:00+00:00"},
+    {"order_reference": "ORD-1003", "customer_id": "CUST-A", "status": "processing", "carrier": "", "estimated_delivery": "2026-11-03", "delivered_on": "", "updated_at": "2026-10-26T07:15:00+00:00"},
+    {"order_reference": "ORD-2001", "customer_id": "CUST-B", "status": "in_transit", "carrier": "Bluebird Freight", "estimated_delivery": "2026-10-28", "delivered_on": "", "updated_at": "2026-10-24T18:20:00+00:00"},
+    {"order_reference": "ORD-2002", "customer_id": "CUST-B", "status": "cancelled", "carrier": "", "estimated_delivery": "", "delivered_on": "", "updated_at": "2026-10-20T11:00:00+00:00"}
+  ]
+}
