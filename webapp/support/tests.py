@@ -25,6 +25,7 @@ from .report import load_baseline, run_report, to_markdown
 from .ops import readiness
 from .health import REPLIES as HEALTH_REPLIES, get_clinic_retriever, parse_triage, screen
 from .tools import MAX_LOOKUPS, get_orders, load_orders, parse_tool_request
+from .models import Feedback
 
 
 class BrokenGateway:
@@ -689,6 +690,67 @@ class Module8ReportTests(TestCase):
         with patch("support.management.commands.evaluation_report.run_report",
                    return_value=run_report(Lowering())), self.assertRaises(CommandError):
             call_command("evaluation_report", stdout=StringIO())
+
+
+class FeedbackTests(TestCase):
+    def chat(self, message):
+        self.client.post("/chat/0/", {"message": message})
+        return self.client.session["last_result"]["feedback_id"]
+
+    def rate(self, turn_id, rating="not_helpful"):
+        return self.client.post("/feedback/", {"turn_id": turn_id, "rating": rating})
+
+    def test_an_agent_reply_is_rated_once_and_the_record_holds_ids_only(self):
+        self.client.post("/chat/0/", {"message": "Where is my order?", "customer": "CUST-A"})
+        turn_id = self.chat("ORD-1001")
+        self.assertContains(self.client.get("/"), "Did this reply help?")
+        self.assertRedirects(self.rate(turn_id), "/?stage=0")
+        row = Feedback.objects.get()
+        self.assertEqual((row.rating, row.route, row.status, row.tool_decision),
+                         ("not_helpful", "use_tool", "ok", "allowed"))
+        stored = json.dumps(list(Feedback.objects.values()), default=str)
+        for text in ("Where is my order", "in transit", "CUST-A", "ORD-1001", self.client.session.session_key):
+            self.assertNotIn(text, stored)
+        self.rate(turn_id, "helpful")  # the same reply again
+        self.assertEqual(Feedback.objects.count(), 1)
+        self.assertContains(self.client.get("/"), "Only the latest reply can be rated, once.")
+
+    def test_forged_ids_unknown_ratings_and_older_replies_are_refused(self):
+        first = self.chat("What is the return policy?")
+        self.rate(first, "excellent")
+        self.rate("f" * 32, "helpful")
+        latest = self.chat("Where is my order?")
+        self.rate(first, "helpful")
+        self.assertFalse(Feedback.objects.exists())
+        self.rate(latest, "helpful")
+        self.assertEqual(Feedback.objects.get().route, "ask_clarifying_question")
+
+    def test_cited_answers_record_their_documents_and_screened_replies_cannot_be_rated(self):
+        with patch("support.views.get_gateway", return_value=Recording()):
+            self.rate(self.chat("What is the return policy?"))
+        self.assertIn("RET-30 v", Feedback.objects.get().sources)
+        self.assertEqual(self.chat("I have chest pain."), "")
+        self.assertNotIn("agent_feedback", self.client.session)
+        self.assertNotContains(self.client.get("/"), "Did this reply help?")
+        self.client.post("/chat/3/", {"message": "What is the return policy?"})
+        self.assertNotIn("feedback_id", self.client.session["last_result"])  # lessons are not rated
+
+    def test_report_page_shows_feedback_without_changing_the_verdict(self):
+        self.assertContains(self.client.get("/?stage=8"), "No ratings yet.")
+        for message, rating in (("Where is my order?", "not_helpful"), ("Cancel my order", "helpful")):
+            self.rate(self.chat(message), rating)
+        self.client.post("/report/")
+        page = self.client.get("/?stage=8")
+        self.assertContains(page, "CUSTOMER FEEDBACK · 2 RATINGS")
+        self.assertContains(page, "1 of 2 rated agent replies helped.")
+        self.assertContains(page, "RELEASE VERDICT · PASS")
+        self.assertNotContains(page, "Where is my order")
+
+    def test_delete_and_reset_drop_the_pending_rating(self):
+        for action in ("/state/delete/", "/reset/0/"):
+            self.chat("Where is my order?")
+            self.client.post(action, {"stage": "0"})
+            self.assertNotIn("agent_feedback", self.client.session)
 
 
 # Module 9: the production variables, as settings; the test runner already turns DEBUG off.

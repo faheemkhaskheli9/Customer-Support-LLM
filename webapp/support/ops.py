@@ -14,6 +14,7 @@ from .tools import load_orders
 
 BACKENDS = ("offline", "openai")
 RETRIEVAL_MODES = ("keyword", "hybrid")
+TABLES = ("django_session", "support_feedback")  # sessions and the Module 8 feedback log
 # Symptom → first action. Kept in code so the page, the command and the article quote one list.
 RUNBOOK = (
     ("/readyz is 503 on a config check",
@@ -60,11 +61,11 @@ def config_checks() -> list[dict]:
 
 def data_checks() -> list[dict]:
     try:
-        tables = connection.introspection.table_names()
-        database = check("data.database", "Sessions table exists", "django_session" in tables,
-                         "migrations applied" if "django_session" in tables else "run python manage.py migrate")
+        missing = sorted(set(TABLES) - set(connection.introspection.table_names()))
+        database = check("data.database", "Database tables exist", not missing,
+                         "migrations applied" if not missing else "run python manage.py migrate")
     except Exception as exc:  # an unreachable database is a failed check, not a crash
-        database = check("data.database", "Sessions table exists", False, str(exc))
+        database = check("data.database", "Database tables exist", False, str(exc))
     rows = [database]
     # Read from disk, not the cached retriever, so a broken edit shows before the next restart.
     try:
