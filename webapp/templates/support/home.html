@@ -11,7 +11,7 @@
   <div class="shell">
     <header class="site-header">
       <div><p class="eyebrow">BUILD → BREAK → MEASURE → IMPROVE</p><h1>Customer Support LLM</h1>
-        <p class="subtitle">One web app. Eight steps from first model call to cited answers, read-only order lookups, a clinic chat with a safety screen and one release report.</p></div>
+        <p class="subtitle">One web app. Nine steps from first model call to cited answers, read-only order lookups, a clinic chat with a safety screen, one release report and a deployment runbook.</p></div>
       <span class="badge">Fictional data only</span>
     </header>
 
@@ -37,6 +37,7 @@
         {% if stage == 6 %}<p class="explain">The model may only propose a read-only order lookup. Code checks the sign-in and that the order is yours, runs the tool and writes the reply from the order record. Nothing can be changed.</p>{% endif %}
         {% if stage == 7 %}<p class="explain">A fictional clinic's support chat. Code screens every message for emergencies, clinical questions and action requests before any model call. Only questions about how the clinic works are answered, from approved clinic documents. Nothing you type here is kept.</p>{% endif %}
         {% if stage == report_stage %}<p class="explain">Runs every offline evaluation from Modules 3, 5, 6 and 7 in one go. Safety gates must hold exactly; quality metrics may not drop below the frozen baseline. Any failed gate blocks the release and names its cases.</p>{% endif %}
+        {% if stage == deploy_stage %}<p class="explain">Checks that this configuration and its data are ready to serve traffic. Liveness (<code>/healthz</code>) only says the process answers; readiness (<code>/readyz</code>) runs these checks and returns 503 naming the ones that fail. No check calls a model.</p>{% endif %}
         {% if stage == agent %}<p class="explain">The main support agent. Each message retrieves approved passages, is routed and updates the reported facts; policy answers cite the retrieved passages and use the recent conversation. Once you give an order number, it looks the order up with the read-only tool for the signed-in customer. It hands off anything it must not do; an emergency or health question gets the Module 7 code-written reply before any model call and is not kept.</p>{% endif %}
 
         {% if history %}<div class="history" aria-label="Recent conversation">
@@ -103,7 +104,16 @@
             {% for g in report.gates %}{% if g.kind == "quality" %}<tr{% if not g.ok %} class="fail"{% endif %}><td>{{ g.suite }}</td><td>{{ g.label }}{% if g.cases %}<br><small>{{ g.cases|join:", " }}</small>{% endif %}</td><td>{{ g.value }} / {{ g.total }}</td><td>{{ g.expected }}</td><td>{% if g.ok %}pass{% else %}FAIL{% endif %}</td></tr>{% endif %}{% endfor %}
           </tbody></table>
         </div>{% endif %}
-        {% if stage != report_stage %}<form class="chat-form" method="post" action="{% url 'chat' stage %}">{% csrf_token %}
+        {% if readiness %}<div class="result verdict-{% if readiness.ready %}pass{% else %}blocked{% endif %}" role="status"><span class="label">READINESS · {% if readiness.ready %}READY{% else %}NOT READY{% endif %}</span>
+          <p>{% if readiness.ready %}Every configuration and data check passes.{% else %}Failing: {{ readiness.failing|join:", " }}.{% endif %}</p>
+          <table><thead><tr><th>Check</th><th>Detail</th><th>Result</th></tr></thead><tbody>
+            {% for c in readiness.checks %}<tr{% if not c.ok %} class="fail"{% endif %}><td>{{ c.label }}<br><small>{{ c.key }}</small></td><td>{{ c.detail }}</td><td>{% if c.ok %}pass{% else %}FAIL{% endif %}</td></tr>{% endfor %}
+          </tbody></table>
+        </div>
+        <div class="result"><span class="label">RUNBOOK · SYMPTOM → FIRST ACTION</span>
+          <table><tbody>{% for symptom, action in runbook %}<tr><td><strong>{{ symptom }}</strong></td><td>{{ action }}</td></tr>{% endfor %}</tbody></table>
+        </div>{% endif %}
+        {% if not no_chat %}<form class="chat-form" method="post" action="{% url 'chat' stage %}">{% csrf_token %}
           <label for="message">Customer message</label>
           <textarea id="message" name="message" required maxlength="4000" rows="4" placeholder="{% if stage == 4 or stage == agent %}Where is my order?{% elif stage == 5 %}Can I return an opened item?{% elif stage == 6 %}Where is order ORD-1001?{% elif stage == 7 %}What should I bring to my first visit?{% elif stage == 3 %}What is the return policy?{% else %}How can you help with my order?{% endif %}"></textarea>
           {% if stage == 5 or stage == agent %}<label for="region">Delivery region</label>
@@ -130,6 +140,8 @@
           <p class="hint">Try: “What should I bring to my first visit?”, “What dose of ibuprofen should I take?”, “Can I take my antibiotic with food?” and “I have chest pain.”</p>{% endif %}
         {% if stage == report_stage %}<h2>One release decision</h2><p>Safety gates are invariants: no forbidden passages, no answer model on a miss, no cross-customer leaks, no tool on a handoff, every emergency caught and never sent to the model, no answers outside clinic admin. Quality metrics are compared with <code>data/report_baseline.json</code>: a drop blocks, a rise is reported.</p>
           <p class="hint">Run it from the terminal too: <code>python manage.py evaluation_report</code> exits with 1 when the release is blocked.</p>{% endif %}
+        {% if stage == deploy_stage %}<h2>Run it outside a laptop</h2><p>Set <code>DJANGO_DEBUG=0</code>, a new <code>DJANGO_SECRET_KEY</code>, <code>DJANGO_ALLOWED_HOSTS</code> and <code>DJANGO_CSRF_TRUSTED_ORIGINS</code>. Then run <code>migrate</code> and <code>collectstatic</code>, and serve with <code>waitress-serve</code> behind an HTTPS proxy (README, “Deploy”).</p>
+          <p class="hint">Before every deploy: <code>python manage.py release_check</code> runs these checks, Django's deploy checks and the Module 8 report, and exits with 1 when any fails.</p>{% endif %}
         {% if stage == agent %}<h2>One agent, every module</h2><p>Retrieved evidence (05) backs validated routing (03) and reported facts (04), cited answers use recent context (02), order numbers are looked up with the read-only tool (06), every reply shows its model metrics (01), and the safety screen (07) runs before all of them.</p>
           <p class="hint">Sign in as customer A, then try: “Where is my order?”, then “ORD-1001”, then “What is the return policy?”</p>{% endif %}
         {% if stage == 6 or stage == agent %}<h3>Tool audit trail</h3>

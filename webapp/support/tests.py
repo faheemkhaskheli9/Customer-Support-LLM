@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from django.core.management import CommandError, call_command
 
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from .corpus import chunk_document, ingest, load_corpus, parse_document, split_text
@@ -21,6 +21,7 @@ from .routing import parse_grounded
 from .service import agent_turn, health_turn, process_turn, rag_turn, tool_turn
 from .evaluation import run_health_evaluation, run_tool_evaluation
 from .report import load_baseline, run_report, to_markdown
+from .ops import readiness
 from .health import REPLIES as HEALTH_REPLIES, get_clinic_retriever, parse_triage, screen
 from .tools import MAX_LOOKUPS, get_orders, load_orders, parse_tool_request
 
@@ -81,8 +82,8 @@ class ConceptEmbedder:
 
 
 class CourseWebTests(TestCase):
-    def test_all_eight_modules_render(self):
-        for stage in range(1, 9):
+    def test_all_nine_modules_render(self):
+        for stage in range(1, 10):
             response = self.client.get(f"/?stage={stage}")
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, f"MODULE 0{stage}")
@@ -687,3 +688,56 @@ class Module8ReportTests(TestCase):
         with patch("support.management.commands.evaluation_report.run_report",
                    return_value=run_report(Lowering())), self.assertRaises(CommandError):
             call_command("evaluation_report", stdout=StringIO())
+
+
+# Module 9: the production variables, as settings; the test runner already turns DEBUG off.
+PRODUCTION = dict(SECRET_KEY="test-only-" + "x" * 50, SECURE_SSL_REDIRECT=True, SESSION_COOKIE_SECURE=True,
+                  CSRF_COOKIE_SECURE=True, SECURE_HSTS_SECONDS=3600, ALLOWED_HOSTS=["support.example.com"])
+
+
+class Module9DeploymentTests(TestCase):
+    def test_liveness_and_readiness(self):
+        self.assertEqual(self.client.get("/healthz").json(), {"status": "ok"})
+        local = self.client.get("/readyz")  # the course defaults are not a deployment
+        self.assertEqual(local.status_code, 503)
+        self.assertEqual(local.json(), {"status": "not ready", "failing": ["config.secret_key", "config.https"]})
+        with override_settings(**PRODUCTION):
+            ready = self.client.get("/readyz", secure=True, HTTP_HOST="support.example.com")
+        self.assertEqual((ready.status_code, ready.json()), (200, {"status": "ready", "failing": []}))
+
+    def test_a_broken_data_file_fails_its_check(self):
+        with patch("support.ops.load_orders", side_effect=ValueError("orders.json: order keys differ")), \
+                patch("support.ops.load_corpus", side_effect=ValueError("bad front matter")):
+            checks = {c["key"]: c for c in readiness()["checks"]}
+        self.assertEqual(checks["data.orders"]["detail"], "orders.json: order keys differ")
+        self.assertEqual([k for k, c in checks.items() if k.startswith("data.") and not c["ok"]],
+                         ["data.corpus", "data.clinic", "data.orders"])
+        self.assertTrue(checks["data.baseline"]["ok"])
+
+    def test_a_live_backend_check_names_missing_variables_never_values(self):
+        with override_settings(SUPPORT_MODEL_BACKEND="openai"):
+            with patch.dict("os.environ", {"OPENAI_API_KEY": "", "OPENAI_MODEL": ""}):
+                missing = {c["key"]: c for c in readiness()["checks"]}["config.backend"]
+            with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-secret", "OPENAI_MODEL": "test-model"}):
+                present = {c["key"]: c for c in readiness()["checks"]}["config.backend"]
+        self.assertEqual((missing["ok"], missing["detail"]), (False, "openai / keyword; missing OPENAI_API_KEY, OPENAI_MODEL"))
+        self.assertTrue(present["ok"])
+        self.assertNotIn("sk-test", present["detail"])
+
+    def test_release_check_command(self):
+        with override_settings(**PRODUCTION):
+            out = StringIO()
+            call_command("release_check", stdout=out, stderr=StringIO())
+            self.assertIn("Ready to deploy.", out.getvalue())
+            with patch("support.management.commands.release_check.run_report", return_value=run_report(Lowering())), \
+                    self.assertRaisesRegex(CommandError, "report blocked by Module 7 safety: Emergency recall"):
+                call_command("release_check", stdout=StringIO(), stderr=StringIO())
+        with self.assertRaisesRegex(CommandError, "config.secret_key, config.https"):
+            call_command("release_check", stdout=StringIO(), stderr=StringIO())
+
+    def test_deployment_page(self):
+        page = self.client.get("/?stage=9")
+        self.assertContains(page, "READINESS · NOT READY")
+        self.assertContains(page, "RUNBOOK")
+        self.assertNotContains(page, "Send message")
+        self.assertRedirects(self.client.post("/chat/9/", {"message": "Hello"}), "/?stage=9")
