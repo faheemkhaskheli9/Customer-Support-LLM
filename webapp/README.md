@@ -16,7 +16,7 @@ The home page (`/?stage=0`) is the **Support agent**, which has every module's f
 
 Every reply shows its model metrics. Fact corrections, retention and deletion work on the same page, and deletion also clears the region.
 
-The older `module-01/` through `module-04/` directories remain as historical CLI companions so published links keep working. New course features belong here.
+The older `module-01/` through `module-04/` directories remain as historical CLI companions so published links keep working. `module-05/` is the standalone `rag_lab` package for the Module 5 article. New course features belong here.
 
 ## Run locally
 

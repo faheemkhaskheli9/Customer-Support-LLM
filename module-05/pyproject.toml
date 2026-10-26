@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "customer-support-llm-module-05"
+version = "0.1.0"
+description = "Standalone approved-retrieval and citation lab"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+live = ["openai>=1.0.0", "python-dotenv>=1.0.0"]
+dev = ["pytest>=8.0.0"]
+
+[project.scripts]
+module-05-demo = "rag_lab.cli:main"
+module-05-eval = "rag_lab.run_eval:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

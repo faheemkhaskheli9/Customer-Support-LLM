@@ -38,4 +38,4 @@ This knowledge base is the working curriculum and product reference for building
 - [Module 4](knowledge-base/modules/module-04.md): reported facts, corrections, browser-session isolation, retention, expiry, and deletion.
 - [Module 5](knowledge-base/modules/module-05.md): retrieval from a versioned approved corpus, citations from metadata, a no-evidence fallback, and a 34-case retrieval evaluation.
 
-The older `module-01/` through `module-04/` CLI packages remain for existing published links. They are historical references; new features are added to `webapp/`. Previous article versions are kept under `docs/legacy/` and `knowledge-base/modules/legacy/`.
+The older `module-01/` through `module-04/` CLI packages remain for existing published links. They are historical references; new features are added to `webapp/`. `module-05/` is the standalone `rag_lab` companion to the Module 5 article: the same retrieval and grounding without Django. Previous article versions are kept under `docs/legacy/` and `knowledge-base/modules/legacy/`.
