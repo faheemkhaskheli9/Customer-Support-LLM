@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from .gateway import get_gateway
+from .ops import RUNBOOK, readiness
 from .report import run_report, to_markdown
 from .evaluation import run_health_evaluation, run_offline_evaluation, run_rag_evaluation, run_tool_evaluation
 from .retrieval import corpus_table, get_retriever
@@ -28,6 +29,7 @@ STAGES = {  # insertion order is nav order: the main agent first, then the lesso
     6: ("Read-only tools", "Order lookups behind sign-in, permission checks, and an audit trail"),
     7: ("Healthcare support", "Emergency and clinical screening in code, clinic-only answers"),
     8: ("Evaluation report", "Every offline evaluation, release gates and one verdict"),
+    9: ("Deployment", "Readiness checks, a release check and the runbook"),
 }
 # Region is application-owned access control, validated here, never extracted by the model.
 REGIONS = {"": "Not set", "PK": "Pakistan", "AE": "United Arab Emirates"}
@@ -36,6 +38,8 @@ TOOL_STAGE = 6
 TOOL_STAGES = (TOOL_STAGE, AGENT)
 HEALTH_STAGE = 7
 REPORT_STAGE = 8
+DEPLOY_STAGE = 9
+NO_CHAT_STAGES = (REPORT_STAGE, DEPLOY_STAGE)  # pages with no conversation
 HISTORY_KEYS = {2: "m2_history", 3: "m3_history", AGENT: "agent_history"}
 
 
@@ -58,7 +62,7 @@ def home(request):
     corpus = corpus_rows(request) if stage in RETRIEVAL_STAGES else []
     return render(request, "support/home.html", {
         "stage": stage, "stages": STAGES, "stage_title": STAGES[stage][0], "agent": AGENT,
-        "report_stage": REPORT_STAGE,
+        "report_stage": REPORT_STAGE, "deploy_stage": DEPLOY_STAGE, "no_chat": stage in NO_CHAT_STAGES,
         "history": request.session.get(HISTORY_KEYS.get(stage, ""), []),
         "state": state, "result": request.session.pop("last_result", None),
         "evaluation": request.session.pop("evaluation", None),
@@ -75,6 +79,8 @@ def home(request):
         "tool_evaluation": request.session.pop("tool_evaluation", None),
         "health_evaluation": request.session.pop("health_evaluation", None),
         "report": request.session.pop("report", None),
+        # Module 9: read-only and cheap, so the checks run on every visit to the page.
+        "readiness": readiness() if stage == DEPLOY_STAGE else None, "runbook": RUNBOOK,
     })
 
 
@@ -90,8 +96,8 @@ def corpus_rows(request) -> list[dict]:
 def chat(request, stage: int):
     if stage not in STAGES:
         return redirect("home")
-    if stage == REPORT_STAGE:  # the report page has no conversation
-        return redirect(f"/?stage={REPORT_STAGE}")
+    if stage in NO_CHAT_STAGES:
+        return redirect(f"/?stage={stage}")
     if stage in RETRIEVAL_STAGES and "region" in request.POST and request.POST["region"] in REGIONS:
         request.session["region"] = request.POST.get("region", "")
     if stage in TOOL_STAGES and "customer" in request.POST and request.POST["customer"] in {"", *get_orders().customers}:
@@ -154,6 +160,18 @@ def report_markdown(request):
     response = HttpResponse(to_markdown(run_report()), content_type="text/markdown; charset=utf-8")
     response["Content-Disposition"] = 'attachment; filename="evaluation-report.md"'
     return response
+
+
+def healthz(request):
+    """Liveness: the process answers. No database, files or model are touched."""
+    return JsonResponse({"status": "ok"})
+
+
+def readyz(request):
+    """Readiness: names the failing checks, never their details, since the endpoint is public."""
+    result = readiness()
+    return JsonResponse({"status": "ready" if result["ready"] else "not ready", "failing": result["failing"]},
+                        status=200 if result["ready"] else 503)
 
 
 @require_POST
