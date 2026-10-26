@@ -39,5 +39,6 @@ This knowledge base is the working curriculum and product reference for building
 - [Module 5](knowledge-base/modules/module-05.md): retrieval from a versioned approved corpus, citations from metadata, a no-evidence fallback, and a 34-case retrieval evaluation.
 - [Module 6](knowledge-base/modules/module-06.md): a read-only order lookup tool behind sign-in and ownership checks, code-written replies, an audit trail, and a 16-case tool evaluation.
 - [Module 7](knowledge-base/modules/module-07.md) ([outline](knowledge-base/modules/module-07-outline.md)): a clinic support page that screens for emergencies and clinical questions in code before any model call, answers only clinic admin questions from approved clinic documents, and a 20-case safety evaluation.
+- Module 8: one evaluation and safety report over all 94 cases from Modules 3, 5, 6 and 7, with exact safety gates, a frozen quality baseline and a `pass` or `blocked` verdict.
 
 The older `module-01/` through `module-04/` CLI packages remain for existing published links. They are historical references; new features are added to `webapp/`. `module-05/` is the standalone `rag_lab` companion to the Module 5 article: the same retrieval and grounding without Django. Previous article versions are kept under `docs/legacy/` and `knowledge-base/modules/legacy/`.

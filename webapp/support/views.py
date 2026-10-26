@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from .gateway import get_gateway
+from .report import run_report, to_markdown
 from .evaluation import run_health_evaluation, run_offline_evaluation, run_rag_evaluation, run_tool_evaluation
 from .retrieval import corpus_table, get_retriever
 from .service import active_state, agent_turn, health_turn, process_turn, rag_turn, tool_turn
@@ -25,6 +27,7 @@ STAGES = {  # insertion order is nav order: the main agent first, then the lesso
     5: ("Approved retrieval", "Versioned documents, filters first, citations, and a no-evidence fallback"),
     6: ("Read-only tools", "Order lookups behind sign-in, permission checks, and an audit trail"),
     7: ("Healthcare support", "Emergency and clinical screening in code, clinic-only answers"),
+    8: ("Evaluation report", "Every offline evaluation, release gates and one verdict"),
 }
 # Region is application-owned access control, validated here, never extracted by the model.
 REGIONS = {"": "Not set", "PK": "Pakistan", "AE": "United Arab Emirates"}
@@ -32,6 +35,7 @@ RETRIEVAL_STAGES = (5, AGENT)
 TOOL_STAGE = 6
 TOOL_STAGES = (TOOL_STAGE, AGENT)
 HEALTH_STAGE = 7
+REPORT_STAGE = 8
 HISTORY_KEYS = {2: "m2_history", 3: "m3_history", AGENT: "agent_history"}
 
 
@@ -54,6 +58,7 @@ def home(request):
     corpus = corpus_rows(request) if stage in RETRIEVAL_STAGES else []
     return render(request, "support/home.html", {
         "stage": stage, "stages": STAGES, "stage_title": STAGES[stage][0], "agent": AGENT,
+        "report_stage": REPORT_STAGE,
         "history": request.session.get(HISTORY_KEYS.get(stage, ""), []),
         "state": state, "result": request.session.pop("last_result", None),
         "evaluation": request.session.pop("evaluation", None),
@@ -69,6 +74,7 @@ def home(request):
         "audit": list(reversed(request.session.get("tool_audit", []))) if stage in TOOL_STAGES else [],
         "tool_evaluation": request.session.pop("tool_evaluation", None),
         "health_evaluation": request.session.pop("health_evaluation", None),
+        "report": request.session.pop("report", None),
     })
 
 
@@ -84,6 +90,8 @@ def corpus_rows(request) -> list[dict]:
 def chat(request, stage: int):
     if stage not in STAGES:
         return redirect("home")
+    if stage == REPORT_STAGE:  # the report page has no conversation
+        return redirect(f"/?stage={REPORT_STAGE}")
     if stage in RETRIEVAL_STAGES and "region" in request.POST and request.POST["region"] in REGIONS:
         request.session["region"] = request.POST.get("region", "")
     if stage in TOOL_STAGES and "customer" in request.POST and request.POST["customer"] in {"", *get_orders().customers}:
@@ -133,6 +141,19 @@ def tool_evaluate(request):
 def health_evaluate(request):
     request.session["health_evaluation"] = run_health_evaluation()
     return redirect(f"/?stage={HEALTH_STAGE}")
+
+
+@require_POST
+def report(request):
+    request.session["report"] = run_report()
+    return redirect(f"/?stage={REPORT_STAGE}")
+
+
+def report_markdown(request):
+    """Read-only, so a GET; the report is run fresh, never taken from the session."""
+    response = HttpResponse(to_markdown(run_report()), content_type="text/markdown; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="evaluation-report.md"'
+    return response
 
 
 @require_POST
